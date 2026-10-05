@@ -257,11 +257,19 @@ body.lock .toast{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 14px)}
 .bulk-in:focus{border-color:var(--accent)}
 .bulk-total{display:flex;justify-content:space-between;align-items:center;padding:14px 2px 0;margin-top:12px;border-top:1px solid var(--line);font-weight:650}
 .bulk-total b{font-size:20px}
+
+/* חיווי סנכרון */
+.sync{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:650;background:var(--sunk);color:var(--ink-2);white-space:nowrap}
+.sync::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.sync.syncing::before{animation:pulse .9s ease-in-out infinite alternate}
+.sync.waiting{background:#FDF1D8;color:#6A4A06}
+.sync.done{background:color-mix(in srgb,var(--income) 16%,var(--surface));color:var(--income)}
+@media (prefers-color-scheme:dark){.sync.waiting{background:#3A2E12;color:#F1D48A}}
 </style>
 </head>
 <body>
 <div class="app">
-  <header class="top"><h1 id="top-title">הכסף שלי</h1><div class="sub" id="top-sub">&nbsp;</div></header>
+  <header class="top"><div class="row between"><h1 id="top-title">הכסף שלי</h1><span class="sync hidden" id="sync" role="status" aria-live="polite"></span></div><div class="sub" id="top-sub">&nbsp;</div></header>
   <main id="view">
     <div class="skel" style="height:150px"></div>
     <div class="skel" style="height:260px;border-radius:26px"></div>
@@ -400,7 +408,7 @@ const S={
   tx:{categories:[],transactions:[]},
   nw:{assets:[],liabilities:[],history:[]},
   view:'home',month:monthKey(new Date()),txType:'all',txCat:null,range:'all',
-  catTab:'expense',histOpen:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:''
+  catTab:'expense',histOpen:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
 };
 
 /* ================= storage ================= */
@@ -430,7 +438,27 @@ function normNw(o){
 }
 
 /* ================= firebase (נתונים + התחברות) ================= */
-const LOAD_KEYS=['profile','categories','tx','assets','liabilities','history'];
+const LOAD_KEYS=['profile','categories','month','recent','assets','liabilities','history'];
+
+/* ---------- תנועות: טעינה לפי צורך ----------
+   התנועות נטענות ממספר מקורות קטנים: החודש הנוכחי, החודש שמוצג במסך התנועות, ו-10 האחרונות.
+   S.tx.transactions הוא האיחוד שלהם. */
+const TXS={src:{}};
+function txRebuild(){
+  const m=new Map();
+  Object.keys(TXS.src).forEach(k=>TXS.src[k].forEach((t,id)=>m.set(id,t)));
+  S.tx.transactions=Array.from(m.values());
+}
+function txSource(key,docs){
+  TXS.src[key]=new Map(normTx({transactions:docs}).transactions.map(t=>[t.id,t]));
+  txRebuild();
+}
+function wantedMonths(){
+  const w=new Set([monthKey(new Date())]);
+  if(S.view==='tx')w.add(S.month);
+  return w;
+}
+function syncMonths(){if(S.ready&&D.setMonths)D.setMonths(wantedMonths());}
 const SKEL='<div class="skel" style="height:150px"></div><div class="skel" style="height:260px;border-radius:26px"></div>';
 
 function markLoaded(k){
@@ -440,6 +468,38 @@ function markLoaded(k){
   if(S.ready)render();
   if(first&&S.quick){S.quick=false;openTxSheet();}
 }
+
+
+/* ---------- חיווי סנכרון ---------- */
+const SYNC={n:0,shown:null,showT:0,slowT:0,doneT:0};
+const SYNC_TXT={syncing:'מסנכרן…',waiting:'ממתין לסנכרון',done:'הכול מסונכרן'};
+function syncChip(state){
+  const el=$('#sync');if(!el)return;
+  SYNC.shown=state;
+  if(!state){el.className='sync hidden';el.textContent='';return;}
+  el.className='sync '+state;el.textContent=SYNC_TXT[state];
+}
+function syncUpdate(){
+  clearTimeout(SYNC.doneT);
+  if(SYNC.n>0){
+    if(SYNC.shown==='done')syncChip(null);
+    if(navigator.onLine===false){
+      clearTimeout(SYNC.showT);clearTimeout(SYNC.slowT);SYNC.showT=0;SYNC.slowT=0;
+      syncChip('waiting');return;
+    }
+    if(SYNC.shown==='waiting')syncChip('syncing');
+    if(!SYNC.showT&&!SYNC.shown){
+      SYNC.showT=setTimeout(()=>{SYNC.showT=0;if(SYNC.n>0&&!SYNC.shown)syncChip('syncing');},700);
+    }
+    clearTimeout(SYNC.slowT);
+    SYNC.slowT=setTimeout(()=>{SYNC.slowT=0;if(SYNC.n>0)syncChip('waiting');},5000);
+  }else{
+    clearTimeout(SYNC.showT);clearTimeout(SYNC.slowT);SYNC.showT=0;SYNC.slowT=0;
+    if(SYNC.shown){syncChip('done');SYNC.doneT=setTimeout(()=>syncChip(null),2000);}
+  }
+}
+function syncBegin(){SYNC.n++;syncUpdate();}
+function syncEnd(){SYNC.n=Math.max(0,SYNC.n-1);syncUpdate();}
 
 /*FB-START*/
 const D={
@@ -462,7 +522,7 @@ const D={
     if(e&&e.code==='permission-denied'){showNoAccess();return;}
     toast('השמירה נכשלה – נסה שוב','err');
   },
-  w(p){p.catch(e=>this.fail(e));},
+  w(p){syncBegin();p.catch(e=>this.fail(e)).finally(syncEnd);},
   listen(name,apply){
     this.unsubs.push(this.F.onSnapshot(this.col(name),snap=>{
       apply(snap.docs.map(d=>Object.assign({id:d.id},d.data())));
@@ -471,17 +531,64 @@ const D={
   },
   start(user){
     this.stop();this.uid=user.uid;
+    syncBegin();this.F.waitForPendingWrites(this.db).catch(()=>{}).finally(syncEnd);
     this.unsubs.push(this.F.onSnapshot(this.ref('meta','profile'),{includeMetadataChanges:true},snap=>{
       if(!snap.exists()&&!snap.metadata.fromCache&&!this.seeding){this.seeding=true;this.seed();}
       markLoaded('profile');
     },e=>this.fail(e)));
     this.listen('categories',a=>{S.tx.categories=normTx({categories:a}).categories.sort((x,y)=>x.ord-y.ord);});
-    this.listen('tx',a=>{S.tx.transactions=normTx({transactions:a}).transactions;});
+    this.unsubs.push(this.F.onSnapshot(this.F.query(this.col('tx'),this.F.orderBy('date','desc'),this.F.limit(10)),snap=>{
+      txSource('recent',snap.docs.map(d=>Object.assign({id:d.id},d.data())));
+      markLoaded('recent');
+    },e=>this.fail(e)));
     this.listen('assets',a=>{S.nw.assets=normNw({assets:a}).assets;});
     this.listen('liabilities',a=>{S.nw.liabilities=normNw({liabilities:a}).liabilities;});
     this.listen('history',a=>{S.nw.history=normNw({history:a}).history;});
+    this.setMonths(wantedMonths());
   },
-  stop(){this.unsubs.forEach(u=>{try{u();}catch(e){}});this.unsubs=[];this.seeding=false;},
+  monthSubs:{},
+  setMonths(want){
+    let removed=false;
+    Object.keys(this.monthSubs).forEach(mk=>{
+      if(!want.has(mk)){
+        try{this.monthSubs[mk]();}catch(e){}
+        delete this.monthSubs[mk];delete TXS.src['m:'+mk];S.monthLoaded[mk]=false;delete S.monthCache[mk];removed=true;
+      }
+    });
+    if(removed)txRebuild();
+    want.forEach(mk=>{if(!this.monthSubs[mk])this.watchMonth(mk);});
+  },
+  watchMonth(mk){
+    const F=this.F;
+    const q=F.query(this.col('tx'),F.where('date','>=',mk+'-01'),F.where('date','<',shiftMonth(mk,1)+'-01'));
+    this.monthSubs[mk]=F.onSnapshot(q,snap=>{
+      txSource('m:'+mk,snap.docs.map(d=>Object.assign({id:d.id},d.data())));
+      S.monthLoaded[mk]=true;S.monthCache[mk]=snap.metadata.fromCache;
+      if(mk===monthKey(new Date()))markLoaded('month');else if(S.ready)render();
+    },e=>this.fail(e));
+  },
+  stop(){
+    this.unsubs.forEach(u=>{try{u();}catch(e){}});this.unsubs=[];this.seeding=false;
+    Object.keys(this.monthSubs).forEach(k=>{try{this.monthSubs[k]();}catch(e){}});
+    this.monthSubs={};TXS.src={};S.monthLoaded={};S.monthCache={};
+  },
+  /* קריאות חד-פעמיות מהשרת (לא מהמטמון) */
+  async txIds(){return (await this.F.getDocsFromServer(this.col('tx'))).docs.map(d=>d.id);},
+  async allTx(){
+    const snap=await this.F.getDocsFromServer(this.col('tx'));
+    return normTx({transactions:snap.docs.map(d=>Object.assign({id:d.id},d.data()))}).transactions;
+  },
+  async countCat(id){
+    const F=this.F;
+    return (await F.getCountFromServer(F.query(this.col('tx'),F.where('categoryId','==',id)))).data().count;
+  },
+  async stats(cats){
+    const F=this.F,col=this.col('tx');
+    const tot=await F.getCountFromServer(col);
+    const rows=await Promise.all(cats.map(c=>F.getCountFromServer(F.query(col,F.where('categoryId','==',c.id))).then(r=>[c.id,r.data().count])));
+    const byCat={};rows.forEach(([id,n])=>{byCat[id]=n;});
+    return {total:tot.data().count,byCat};
+  },
   seed(){
     const b=this.F.writeBatch(this.db);
     b.set(this.ref('meta','profile'),{seeded:true,createdAt:Date.now()});
@@ -520,6 +627,10 @@ const D={
     }
   },
   async importAll(tx,nw){
+    syncBegin();
+    try{await this._importAll(tx,nw);}finally{syncEnd();}
+  },
+  async _importAll(tx,nw){
     const ops=[];
     tx.categories.forEach(c=>{const {id,...r}=c;ops.push({ref:this.ref('categories',id),data:r});});
     tx.transactions.forEach(t=>{const {id,...r}=t;ops.push({ref:this.ref('tx',id),data:r});});
@@ -529,6 +640,10 @@ const D={
     await this.runOps(ops);
   },
   async wipe(old,cats){
+    syncBegin();
+    try{await this._wipe(old,cats);}finally{syncEnd();}
+  },
+  async _wipe(old,cats){
     const ops=[];
     old.cats.forEach(id=>ops.push({ref:this.ref('categories',id),del:true}));
     old.txs.forEach(id=>ops.push({ref:this.ref('tx',id),del:true}));
@@ -662,6 +777,7 @@ function usageCounts(){const m={};for(const t of S.tx.transactions)m[t.categoryI
 /* ================= UI bits ================= */
 let toastTimer;
 function toast(msg,kind){
+  if(!kind&&navigator.onLine===false&&/נשמר|נוסף|נמחק|עודכנ/.test(msg))msg+=' · במכשיר בלבד';
   const el=$('#toast');el.textContent=msg;el.className='toast show'+(kind?' '+kind:'');
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>{el.className='toast';},2300);
 }
@@ -876,7 +992,11 @@ function viewTx(){
     }
   }
 
-  if(!monthTx.length){
+  if(!S.monthLoaded[mk]){
+    h+='<div class="skel" style="height:64px;margin-top:16px"></div><div class="skel" style="height:64px"></div><div class="skel" style="height:64px"></div>';
+  }else if(!monthTx.length&&S.monthCache[mk]&&navigator.onLine===false){
+    h+='<div class="surface empty" style="margin-top:16px">אין חיבור, והחודש הזה עוד לא נשמר במכשיר.</div>';
+  }else if(!monthTx.length){
     h+='<div class="surface empty" style="margin-top:16px">אין תנועות ב'+esc(monthName(mk))+'.<br><button class="btn primary" data-a="fab">הוספת תנועה</button></div>';
   }else if(!list.length){
     h+='<div class="surface empty" style="margin-top:16px">אין תנועות שמתאימות לסינון.<br><button class="btn ghost" data-a="tx-clear">ניקוי סינון</button></div>';
@@ -936,7 +1056,7 @@ function viewNw(){
 }
 
 function viewSettings(){
-  const type=S.catTab,cats=S.tx.categories.filter(c=>c.type===type),counts=usageCounts();
+  const type=S.catTab,cats=S.tx.categories.filter(c=>c.type===type);
   const email=S.user&&S.user.email?S.user.email:'';
   let h='<div class="sec-h" style="margin-top:4px"><h3>חשבון</h3></div>'+
     '<div class="surface"><div class="row between" style="gap:12px"><span class="muted small">מחובר כ־</span><span class="num small">'+esc(email)+'</span></div>'+
@@ -944,20 +1064,23 @@ function viewSettings(){
   h+='<div class="sec-h"><h3>קטגוריות</h3></div>';
   h+='<div class="seg" style="margin-bottom:10px"><button data-a="cat-tab" data-v="expense" class="'+(type==='expense'?'on exp':'')+'">הוצאות</button><button data-a="cat-tab" data-v="income" class="'+(type==='income'?'on inc':'')+'">הכנסות</button></div>';
   h+='<div class="surface list">'+(cats.length?cats.map(c=>
-    '<button class="tx-row" data-a="cat-edit" data-id="'+esc(c.id)+'"><span class="ic" style="--c:'+c.color+'">'+esc(c.icon)+'</span><span class="tx-main"><span class="tx-title">'+esc(c.name)+'</span><span class="tx-sub">'+(counts[c.id]||0)+' תנועות</span></span><span class="muted">'+ICON.chevL+'</span></button>'
+    '<button class="tx-row" data-a="cat-edit" data-id="'+esc(c.id)+'"><span class="ic" style="--c:'+c.color+'">'+esc(c.icon)+'</span><span class="tx-main"><span class="tx-title">'+esc(c.name)+'</span></span><span class="muted">'+ICON.chevL+'</span></button>'
   ).join(''):'<div class="empty">אין עדיין קטגוריות '+(type==='expense'?'הוצאה':'הכנסה')+'.</div>')+
     '<button class="add-row" data-a="cat-add">＋ קטגוריה חדשה</button></div>';
 
+  h+='<div class="sec-h"><h3>סטטיסטיקות</h3></div><div class="surface"><p class="muted small">כמה תנועות יש בכל קטגוריה, כולל חודשים ישנים. הספירה מתבצעת בשרת ולכן דורשת חיבור.</p>'+
+    '<button class="btn ghost full" style="margin-top:12px" data-a="stats">הצגת סטטיסטיקות</button></div>';
   h+='<div class="sec-h"><h3>גיבוי ושחזור</h3></div><div class="surface"><p class="muted small">הנתונים נשמרים בחשבון שלך ומסונכרנים בין המכשירים. הגיבוי הוא קובץ שאפשר לשמור ב־iCloud ולייבא ממנו בחזרה.</p>'+
     '<div class="row" style="gap:10px;margin-top:12px"><button class="btn ghost grow" data-a="bk" data-v="export">ייצוא גיבוי</button><button class="btn ghost grow" data-a="bk" data-v="import">ייבוא מקובץ</button></div></div>';
   h+='<div class="sec-h"><h3>מחיקת נתונים</h3></div><div class="surface"><button class="btn danger ghost full" data-a="reset">מחיקת כל הנתונים</button></div>';
   h+='<p class="foot">הנתונים שלך פרטיים ומסונכרנים בין המכשירים.<br>'+
-    S.tx.transactions.length+' תנועות, '+(S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות, '+S.nw.history.length+' נקודות בגרף</p>';
+    (S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות, '+S.nw.history.length+' נקודות בגרף</p>';
   return h;
 }
 
 function render(){
   if(!S.ready)return;
+  syncMonths();
   const views={home:viewHome,tx:viewTx,nw:viewNw,settings:viewSettings};
   $('#view').innerHTML=bannerHtml()+views[S.view]();
   $('#top-title').textContent=TITLES[S.view];
@@ -1022,6 +1145,7 @@ function saveTx(){
   const date=/^\d{4}-\d{2}-\d{2}$/.test($('#f-date').value)?$('#f-date').value:todayStr();
   const note=$('#f-note').value.trim();
   const catName=catView(f.categoryId).name;
+  const mk=date.slice(0,7),active=wantedMonths().has(mk);
   let t;
   if(f.id){
     t=S.tx.transactions.find(x=>x.id===f.id);
@@ -1029,11 +1153,11 @@ function saveTx(){
     Object.assign(t,{type:f.type,amount,categoryId:f.categoryId,catName,date,note});
   }else{
     t={id:uid(),type:f.type,amount,categoryId:f.categoryId,catName,date,note,createdAt:Date.now()};
-    S.tx.transactions.push(t);
+    if(active)S.tx.transactions.push(t);
   }
   const edited=!!f.id;
   D.putTx(t);closeSheet();render();
-  toast(edited?'השינויים נשמרו':(f.type==='income'?'ההכנסה נשמרה':'ההוצאה נשמרה'));
+  toast(!active?'נשמר ב'+monthName(mk):edited?'השינויים נשמרו':(f.type==='income'?'ההכנסה נשמרה':'ההוצאה נשמרה'));
 }
 
 /* ================= sheets: assets & liabilities ================= */
@@ -1076,27 +1200,6 @@ function saveNw(){
 }
 
 /* ================= sheets: categories ================= */
-function openCatSheet(id){
-  const c=id?S.tx.categories.find(x=>x.id===id):null;
-  if(id&&!c)return;
-  const used=c?S.tx.transactions.filter(t=>t.categoryId===c.id).length:0;
-  const f=S.form={kind:'cat',id:c?c.id:null,type:c?c.type:S.catTab,color:c?c.color:PALETTE[S.tx.categories.length%PALETTE.length],used};
-  const html=sheetHead(c?'עריכת קטגוריה':'קטגוריה חדשה')+
-    '<div class="row" style="gap:8px;margin-top:6px"><input id="c-icon" class="input emoji-in" maxlength="8" aria-label="אייקון" value="'+esc(c?c.icon:'🏷️')+'"><input id="c-name" class="input grow" enterkeyhint="done" placeholder="שם הקטגוריה" value="'+esc(c?c.name:'')+'"></div>'+
-    '<div class="emoji-pick">'+EMOJIS.map(e=>'<button data-a="f-emoji" data-v="'+e+'" aria-label="בחירת אייקון">'+e+'</button>').join('')+'</div>'+
-    '<div class="field-label">סוג</div><div class="seg'+(used?' locked':'')+'" id="c-type"><button data-a="f-ctype" data-v="expense">הוצאה</button><button data-a="f-ctype" data-v="income">הכנסה</button></div>'+
-    (used?'<p class="hint">יש '+used+' תנועות בקטגוריה, ולכן אי אפשר לשנות את הסוג שלה.</p>':'')+
-    '<div class="field-label">צבע</div><div class="swatches">'+PALETTE.map(p=>'<button class="sw" style="--c:'+p+'" data-a="f-color" data-v="'+p+'" aria-label="צבע"></button>').join('')+'</div>'+
-    '<div class="sheet-actions">'+(c?'<button class="btn ghost danger" data-a="cat-del">מחיקה</button>':'')+'<button class="btn primary grow" data-a="cat-save" data-primary>'+(c?'שמירת שינויים':'הוספת קטגוריה')+'</button></div>';
-  openSheet(html);
-  syncCatForm();
-  if(!c)focusEl($('#c-name'));
-}
-function syncCatForm(){
-  const f=S.form;
-  $$('#c-type button').forEach(b=>{b.className=b.dataset.v===f.type?'on '+(f.type==='expense'?'exp':'inc'):'';});
-  $$('#sheet .sw').forEach(b=>b.classList.toggle('on',b.dataset.v===f.color));
-}
 function saveCat(){
   const f=S.form;if(!f)return;
   const name=$('#c-name').value.trim();
@@ -1106,7 +1209,7 @@ function saveCat(){
   if(f.id){
     c=S.tx.categories.find(x=>x.id===f.id);
     if(!c)return;
-    Object.assign(c,{name,icon,color:f.color,type:f.used?c.type:f.type});
+    Object.assign(c,{name,icon,color:f.color,type:catLocked(f)?c.type:f.type});
   }else{
     c={id:uid(),name,icon,type:f.type,color:f.color,ord:Date.now()};
     S.tx.categories.push(c);
@@ -1173,11 +1276,72 @@ function saveBulk(){
   toast(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר');
 }
 
+/* ================= sheet: קטגוריה (עם ספירת שימוש מהשרת) ================= */
+function localCatUse(id){let n=0;for(const t of S.tx.transactions)if(t.categoryId===id)n++;return n;}
+function catLocked(f){return !!f.id&&!(f.usedKnown&&f.used===0);}
+function openCatSheet(id){
+  const c=id?S.tx.categories.find(x=>x.id===id):null;
+  if(id&&!c)return;
+  const f=S.form={kind:'cat',id:c?c.id:null,type:c?c.type:S.catTab,color:c?c.color:PALETTE[S.tx.categories.length%PALETTE.length],
+    used:c?localCatUse(c.id):0,usedKnown:false,countFailed:false};
+  const html=sheetHead(c?'עריכת קטגוריה':'קטגוריה חדשה')+
+    '<div class="row" style="gap:8px;margin-top:6px"><input id="c-icon" class="input emoji-in" maxlength="8" aria-label="אייקון" value="'+esc(c?c.icon:'🏷️')+'"><input id="c-name" class="input grow" enterkeyhint="done" placeholder="שם הקטגוריה" value="'+esc(c?c.name:'')+'"></div>'+
+    '<div class="emoji-pick">'+EMOJIS.map(e=>'<button data-a="f-emoji" data-v="'+e+'" aria-label="בחירת אייקון">'+e+'</button>').join('')+'</div>'+
+    '<div class="field-label">סוג</div><div class="seg" id="c-type"><button data-a="f-ctype" data-v="expense">הוצאה</button><button data-a="f-ctype" data-v="income">הכנסה</button></div>'+
+    '<p class="hint" id="c-used-hint"></p>'+
+    '<div class="field-label">צבע</div><div class="swatches">'+PALETTE.map(p=>'<button class="sw" style="--c:'+p+'" data-a="f-color" data-v="'+p+'" aria-label="צבע"></button>').join('')+'</div>'+
+    '<div class="sheet-actions">'+(c?'<button class="btn ghost danger" data-a="cat-del">מחיקה</button>':'')+'<button class="btn primary grow" data-a="cat-save" data-primary>'+(c?'שמירת שינויים':'הוספת קטגוריה')+'</button></div>';
+  openSheet(html);
+  syncCatForm();
+  if(c){
+    D.countCat(c.id).then(n=>{if(S.form!==f)return;f.used=n;f.usedKnown=true;syncCatForm();})
+      .catch(()=>{if(S.form!==f)return;f.countFailed=true;syncCatForm();});
+  }else focusEl($('#c-name'));
+}
+function syncCatForm(){
+  const f=S.form;if(!f||f.kind!=='cat')return;
+  $$('#c-type button').forEach(b=>{b.className=b.dataset.v===f.type?'on '+(f.type==='expense'?'exp':'inc'):'';});
+  const seg=$('#c-type');if(seg)seg.classList.toggle('locked',catLocked(f));
+  const h=$('#c-used-hint');
+  if(h){
+    h.textContent=!f.id?'':f.usedKnown?(f.used?'יש '+f.used+' תנועות בקטגוריה, ולכן אי אפשר לשנות את הסוג שלה.':''):(f.countFailed?'אין חיבור, ולכן אי אפשר לשנות את הסוג כרגע.':'בודק שימוש בקטגוריה…');
+    h.style.display=h.textContent?'':'none';
+  }
+  $$('#sheet .sw').forEach(b=>b.classList.toggle('on',b.dataset.v===f.color));
+}
+
+/* ================= sheet: סטטיסטיקות ================= */
+async function openStatsSheet(){
+  const f=S.form={kind:'stats'};
+  openSheet(sheetHead('סטטיסטיקות')+'<div id="st-body"><div class="skel" style="height:150px"></div></div>');
+  try{
+    const r=await D.stats(S.tx.categories);
+    if(S.form!==f)return;
+    const row=c=>'<div class="tx-row" style="cursor:default"><span class="ic sm" style="--c:'+c.color+'">'+esc(c.icon)+'</span><span class="tx-main"><span class="tx-title">'+esc(c.name)+'</span></span><b class="num">'+F.n0.format(r.byCat[c.id]||0)+'</b></div>';
+    const grp=(title,type)=>{
+      const list=S.tx.categories.filter(c=>c.type===type).sort((a,b)=>(r.byCat[b.id]||0)-(r.byCat[a.id]||0));
+      return list.length?'<div class="grp-h"><span>'+title+'</span></div>'+list.map(row).join(''):'';
+    };
+    const known=S.tx.categories.reduce((s,c)=>s+(r.byCat[c.id]||0),0),rest=Math.max(0,r.total-known);
+    $('#st-body').innerHTML='<div class="row between" style="padding:6px 2px 2px"><span class="muted">סה"כ תנועות</span><b class="num" style="font-size:20px">'+F.n0.format(r.total)+'</b></div>'+
+      '<div class="surface" style="margin-top:8px;padding:2px 14px">'+grp('הוצאות','expense')+grp('הכנסות','income')+
+      (rest?'<div class="grp-h"><span>אחר</span></div><div class="tx-row" style="cursor:default"><span class="ic sm" style="--c:#7C8580">❔</span><span class="tx-main"><span class="tx-title">ללא קטגוריה</span></span><b class="num">'+F.n0.format(rest)+'</b></div>':'')+'</div>'+
+      '<p class="hint">הספירה מתבצעת בשרת ולא מורידה את התנועות.</p>';
+  }catch(e){
+    console.error(e);
+    if(S.form!==f)return;
+    $('#st-body').innerHTML='<div class="empty">אי אפשר לחשב סטטיסטיקות בלי חיבור לאינטרנט.</div>';
+  }
+}
+
 /* ================= backup ================= */
-function backupData(){return{app:'personal-finance-dashboard',version:2,exportedAt:new Date().toISOString(),tx:S.tx,nw:S.nw};}
 async function doExport(){
+  toast('מכין גיבוי…');
+  let all;
+  try{all=await D.allTx();}catch(e){console.error(e);toast('אין חיבור, אי אפשר לייצא גיבוי כרגע','err');return;}
+  const data={app:'personal-finance-dashboard',version:2,exportedAt:new Date().toISOString(),tx:{categories:S.tx.categories,transactions:all},nw:S.nw};
   const name='finance-backup-'+todayStr()+'.json';
-  const file=new File([JSON.stringify(backupData(),null,2)],name,{type:'application/json'});
+  const file=new File([JSON.stringify(data,null,2)],name,{type:'application/json'});
   try{
     if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return;}
   }catch(e){if(e&&e.name==='AbortError')return;}
@@ -1257,12 +1421,14 @@ document.addEventListener('click',async e=>{
     case 'cat-add':openCatSheet();break;
     case 'cat-edit':openCatSheet(id);break;
     case 'f-emoji':{const i=$('#c-icon');if(i)i.value=v;break;}
-    case 'f-ctype':if(f&&!f.used){f.type=v;syncCatForm();}break;
+    case 'f-ctype':if(f&&!catLocked(f)){f.type=v;syncCatForm();}break;
     case 'f-color':if(f){f.color=v;syncCatForm();}break;
     case 'cat-save':saveCat();break;
     case 'cat-del':{
       if(!f||!f.id)break;
-      const msg=f.used?'יש '+f.used+' תנועות בקטגוריה. הן יישארו, ויסומנו "ללא קטגוריה" בסיכומים (בשורת התנועה יישאר שם הקטגוריה הישן). למחוק?':'למחוק את הקטגוריה?';
+      const msg=f.used?'יש '+f.used+' תנועות בקטגוריה. הן יישארו, ויסומנו "ללא קטגוריה" בסיכומים (בשורת התנועה יישאר שם הקטגוריה הישן). למחוק?'
+        :f.usedKnown?'למחוק את הקטגוריה?'
+        :'אי אפשר לבדוק כמה תנועות משויכות לקטגוריה (אין חיבור). הן יישארו ויסומנו "ללא קטגוריה". למחוק?';
       if(!await askConfirm(msg,{ok:'מחיקה',danger:true}))break;
       S.tx.categories=S.tx.categories.filter(c=>c.id!==f.id);
       if(S.txCat===f.id)S.txCat=null;
@@ -1270,6 +1436,7 @@ document.addEventListener('click',async e=>{
     }
 
     case 'bk':if(v==='export')doExport();else $('#file').click();break;
+    case 'stats':openStatsSheet();break;
     case 'signout':{
       if(!await askConfirm('לצאת מהחשבון?',{ok:'יציאה'}))break;
       try{D.stop();await D.signOut();}catch(err){console.error(err);toast('היציאה נכשלה','err');}
@@ -1277,7 +1444,10 @@ document.addEventListener('click',async e=>{
     }
     case 'reset':{
       if(!await askConfirm('למחוק לצמיתות את כל התנועות, הקטגוריות, הנכסים וההיסטוריה? כדאי לייצא גיבוי קודם.',{ok:'מחיקת הכל',danger:true}))break;
-      const old={cats:S.tx.categories.map(c=>c.id),txs:S.tx.transactions.map(t=>t.id),assets:S.nw.assets.map(x=>x.id),
+      toast('מוחק…');
+      let txIds;
+      try{txIds=await D.txIds();}catch(err){console.error(err);toast('המחיקה דורשת חיבור לאינטרנט','err');break;}
+      const old={cats:S.tx.categories.map(c=>c.id),txs:txIds,assets:S.nw.assets.map(x=>x.id),
         liabs:S.nw.liabilities.map(x=>x.id),hist:S.nw.history.map(p=>String(p.t))};
       const cats=defaultCats();
       S.tx={categories:cats,transactions:[]};S.nw={assets:[],liabilities:[],history:[]};
@@ -1316,8 +1486,8 @@ if(window.visualViewport){window.visualViewport.addEventListener('resize',fitShe
 let rz;
 window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(S.ready){const pts=rangePoints();$$('#view [data-chart]').forEach(el=>drawChart(el,pts));}},150);});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.ready)render();});
-window.addEventListener('online',()=>{if(S.ready)render();});
-window.addEventListener('offline',()=>{if(S.ready)render();});
+window.addEventListener('online',()=>{syncUpdate();if(S.ready)render();});
+window.addEventListener('offline',()=>{syncUpdate();if(S.ready)render();});
 
 /* ================= boot ================= */
 function wantsQuickAdd(){
