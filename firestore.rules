@@ -2,24 +2,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // רשימת האימיילים שמורשים להשתמש באפליקציה (באותיות קטנות).
-    // כדי להוסיף משתמש: מוסיפים את האימייל שלו לכאן ולוחצים Publish ב-Firebase Console.
-    // חשוב: להחליף את הכתובת שלמטה בכתובת שלך לפני הפרסום, אחרת תינעל בחוץ.
-    function approvedEmail() {
-      return request.auth.token.email.lower() in [
-        'REPLACE-WITH-YOUR-EMAIL@gmail.com'
-      ];
-    }
-
+    // משתמש מאושר = אימייל מאומת + קיים מסמך באוסף allowlist ששמו הוא האימייל (באותיות קטנות).
+    // כדי להוסיף או להסיר משתמש: מוסיפים או מוחקים מסמך ב-Firebase Console, בלי לגעת בכללים.
     function approved() {
       return request.auth != null
         && request.auth.token.email_verified == true
-        && approvedEmail();
+        && exists(/databases/$(database)/documents/allowlist/$(request.auth.token.email.lower()));
     }
 
     // כל משתמש מאושר רואה וכותב רק את המסמכים שלו
     match /users/{uid}/{document=**} {
       allow read, write: if approved() && request.auth.uid == uid;
     }
+
+    // האוסף allowlist לא נגיש מהאפליקציה בכלל (נערך רק מהקונסול)
   }
 }
