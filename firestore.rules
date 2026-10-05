@@ -1,9 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // כל משתמש רואה וכותב רק את המסמכים שלו
+
+    // רשימת האימיילים שמורשים להשתמש באפליקציה (באותיות קטנות).
+    // כדי להוסיף משתמש: מוסיפים את האימייל שלו לכאן ולוחצים Publish ב-Firebase Console.
+    // חשוב: להחליף את הכתובת שלמטה בכתובת שלך לפני הפרסום, אחרת תינעל בחוץ.
+    function approvedEmail() {
+      return request.auth.token.email.lower() in [
+        'REPLACE-WITH-YOUR-EMAIL@gmail.com'
+      ];
+    }
+
+    function approved() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && approvedEmail();
+    }
+
+    // כל משתמש מאושר רואה וכותב רק את המסמכים שלו
     match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, write: if approved() && request.auth.uid == uid;
     }
   }
 }
