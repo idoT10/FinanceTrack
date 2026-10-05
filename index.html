@@ -400,7 +400,7 @@ const S={
   tx:{categories:[],transactions:[]},
   nw:{assets:[],liabilities:[],history:[]},
   view:'home',month:monthKey(new Date()),txType:'all',txCat:null,range:'all',
-  catTab:'expense',histOpen:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false
+  catTab:'expense',histOpen:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:''
 };
 
 /* ================= storage ================= */
@@ -570,25 +570,20 @@ function showAuth(mode){
     '<input class="input" id="g-pw" type="password" autocomplete="'+(up?'new-password':'current-password')+'" placeholder="סיסמה" dir="ltr">'+
     '<p class="g-err" id="g-err"></p>'+
     '<button class="btn primary full" id="g-go">'+(up?'יצירת חשבון':'כניסה')+'</button>'+
-    '<div class="g-or">או</div><button class="btn ghost full" id="g-google">המשך עם Google</button>'+
     '<div class="row between" style="margin-top:14px"><button class="link" id="g-sw">'+(up?'כבר יש לי חשבון':'יצירת חשבון חדש')+'</button>'+
     (up?'':'<button class="link" id="g-fp">שכחתי סיסמה</button>')+'</div>');
   $('#g-go').onclick=async()=>{
     const em=$('#g-em').value.trim(),pw=$('#g-pw').value;gateSay('');
     if(!em||!pw){gateSay('יש למלא אימייל וסיסמה');return;}
     try{
-      if(up){const cred=await A.createUserWithEmailAndPassword(D.auth,em,pw);A.sendEmailVerification(cred.user).catch(()=>{});}
+      if(up){
+        const cred=await A.createUserWithEmailAndPassword(D.auth,em,pw);
+        A.sendEmailVerification(cred.user).then(()=>{S.verifyNote='שלחנו קישור אימות למייל. בדקו גם בספאם.';gateSay(S.verifyNote,true);}).catch(()=>{});
+      }
       else await A.signInWithEmailAndPassword(D.auth,em,pw);
     }catch(e){gateErr(e);}
   };
   $('#g-pw').addEventListener('keydown',e=>{if(e.key==='Enter')$('#g-go').click();});
-  $('#g-google').onclick=async()=>{
-    try{await A.signInWithPopup(D.auth,new A.GoogleAuthProvider());}
-    catch(e){
-      if(e&&e.code==='auth/popup-blocked'){try{await A.signInWithRedirect(D.auth,new A.GoogleAuthProvider());}catch(x){gateErr(x);}}
-      else gateErr(e);
-    }
-  };
   $('#g-sw').onclick=()=>showAuth(up?'in':'up');
   if(!up)$('#g-fp').onclick=async()=>{
     const em=$('#g-em').value.trim();
@@ -597,23 +592,24 @@ function showAuth(mode){
   };
 }
 function showVerify(user){
-  gate('<h1>אימות אימייל</h1><p class="muted">שלחנו קישור אימות אל <span class="num">'+esc(user.email)+'</span>. אחרי שתאשרו אותו, לחצו על הכפתור.</p>'+
-    '<p class="g-err" id="g-err"></p>'+
+  gate('<h1>אימות אימייל</h1><p class="muted">האימייל <span class="num">'+esc(user.email)+'</span> עדיין לא אומת. לחצו על "שליחת קישור אימות", אשרו את הקישור שיגיע למייל (בדקו גם בספאם), ואז לחצו "אישרתי".</p>'+
+    '<p class="g-err ok" id="g-err">'+esc(S.verifyNote||'')+'</p>'+
     '<button class="btn primary full" id="g-ok">אישרתי, להמשיך</button>'+
-    '<button class="btn ghost full" id="g-resend" style="margin-top:10px">שליחה מחדש</button>'+
+    '<button class="btn ghost full" id="g-resend" style="margin-top:10px">שליחת קישור אימות</button>'+
     '<button class="link" id="g-out" style="margin-top:12px">יציאה</button>');
   $('#g-ok').onclick=async()=>{
     try{
       await user.reload();
       if(!user.emailVerified){gateSay('האימייל עוד לא אומת. בדקו את תיבת הדואר (וגם ספאם).');return;}
       await user.getIdToken(true);
+      S.verifyNote='';
       enter(user);
     }catch(e){gateErr(e);}
   };
   $('#g-resend').onclick=async()=>{
-    try{await D.A.sendEmailVerification(user);gateSay('נשלח שוב',true);}catch(e){gateErr(e);}
+    try{await D.A.sendEmailVerification(user);S.verifyNote='נשלח. בדקו את התיבה (וגם ספאם); לפעמים זה לוקח כמה דקות.';gateSay(S.verifyNote,true);}catch(e){gateErr(e);}
   };
-  $('#g-out').onclick=()=>D.signOut();
+  $('#g-out').onclick=()=>{S.verifyNote='';D.signOut();};
 }
 function showNoAccess(){
   if(S.noAccess)return;
