@@ -265,6 +265,11 @@ body.lock .toast{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 14px)}
 .sync.waiting{background:#FDF1D8;color:#6A4A06}
 .sync.done{background:color-mix(in srgb,var(--income) 16%,var(--surface));color:var(--income)}
 @media (prefers-color-scheme:dark){.sync.waiting{background:#3A2E12;color:#F1D48A}}
+
+/* סביבת בדיקה */
+.beta-bar{position:sticky;top:0;z-index:70;background:#D9822B;color:#fff;text-align:center;font-weight:700;font-size:13px;padding:calc(env(safe-area-inset-top,0px) + 6px) 12px 7px}
+body.beta .app{padding-top:16px}
+body.beta .gate{padding-top:36px}
 </style>
 </head>
 <body>
@@ -437,6 +442,12 @@ function normNw(o){
   return{assets:items(o.assets,ASSET_CATS),liabilities:items(o.liabilities,LIAB_CATS),history:hist};
 }
 
+/* ================= סביבה: ייצור או בדיקה ================= */
+// אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
+const APP_VERSION='1.0.1';
+const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
+const DATA_COLS=['meta','categories','tx','assets','liabilities','history'];
+
 /* ================= firebase (נתונים + התחברות) ================= */
 const LOAD_KEYS=['profile','categories','month','recent','assets','liabilities','history'];
 
@@ -515,8 +526,9 @@ const D={
     }catch(e){console.warn(e);this.db=fs.getFirestore(this.app);}
   },
   onAuth(cb){return this.A.onAuthStateChanged(this.auth,cb);},
-  col(n){return this.F.collection(this.db,'users',this.uid,n);},
-  ref(n,id){return this.F.doc(this.db,'users',this.uid,n,id);},
+  envRoot(env){return env==='beta'?['users',this.uid,'beta','main']:['users',this.uid];},
+  col(n){return this.F.collection(this.db,...this.envRoot(ENV),n);},
+  ref(n,id){return this.F.doc(this.db,...this.envRoot(ENV),n,id);},
   fail(e){
     console.error(e);
     if(e&&e.code==='permission-denied'){showNoAccess();return;}
@@ -652,6 +664,41 @@ const D={
     old.hist.forEach(id=>ops.push({ref:this.ref('history',id),del:true}));
     cats.forEach(c=>{const {id,...r}=c;ops.push({ref:this.ref('categories',id),data:r});});
     try{await this.runOps(ops);}catch(e){this.fail(e);}
+  },
+  /* ---- כלים לסביבת הבדיקה בלבד. קוראים מהייצור, אף פעם לא כותבים אליו ---- */
+  async readAll(env){
+    const out={};
+    for(const c of DATA_COLS){
+      const snap=await this.F.getDocsFromServer(this.F.collection(this.db,...this.envRoot(env),c));
+      out[c]=snap.docs.map(d=>({id:d.id,data:d.data()}));
+    }
+    return out;
+  },
+  betaRef(c,id){return this.F.doc(this.db,...this.envRoot('beta'),c,id);},
+  async betaCopyFromProd(){
+    if(ENV!=='beta')throw new Error('beta only');
+    syncBegin();
+    try{
+      const prod=await this.readAll('prod'),beta=await this.readAll('beta'),ops=[];
+      DATA_COLS.forEach(c=>{
+        const keep=new Set(prod[c].map(x=>x.id));
+        beta[c].forEach(x=>{if(!keep.has(x.id))ops.push({ref:this.betaRef(c,x.id),del:true});});
+        prod[c].forEach(x=>ops.push({ref:this.betaRef(c,x.id),data:x.data}));
+      });
+      await this.runOps(ops);
+      return DATA_COLS.reduce((n,c)=>n+prod[c].length,0);
+    }finally{syncEnd();}
+  },
+  async betaWipe(){
+    if(ENV!=='beta')throw new Error('beta only');
+    syncBegin();
+    try{
+      const beta=await this.readAll('beta'),ops=[];
+      DATA_COLS.forEach(c=>beta[c].forEach(x=>ops.push({ref:this.betaRef(c,x.id),del:true})));
+      this.seeding=false;   // מאפשר זריעה מחדש של קטגוריות ברירת המחדל אחרי הניקוי
+      await this.runOps(ops);
+      return ops.length;
+    }finally{syncEnd();}
   },
   signOut(){return this.A.signOut(this.auth);}
 };
@@ -1058,7 +1105,14 @@ function viewNw(){
 function viewSettings(){
   const type=S.catTab,cats=S.tx.categories.filter(c=>c.type===type);
   const email=S.user&&S.user.email?S.user.email:'';
-  let h='<div class="sec-h" style="margin-top:4px"><h3>חשבון</h3></div>'+
+  let h='';
+  if(ENV==='beta'){
+    h+='<div class="sec-h" style="margin-top:4px"><h3>סביבת בדיקה</h3></div><div class="surface beta-tools">'+
+      '<p class="muted small">הנתונים כאן נפרדים מהנתונים האמיתיים. ההעתקה קוראת את הנתונים האמיתיים ולא משנה אותם.</p>'+
+      '<button class="btn ghost full" style="margin-top:12px" data-a="beta-copy">העתקת הנתונים האמיתיים לבדיקה</button>'+
+      '<button class="btn danger ghost full" style="margin-top:10px" data-a="beta-wipe">ניקוי נתוני הבדיקה</button></div>';
+  }
+  h+='<div class="sec-h"'+(ENV==='beta'?'':' style="margin-top:4px"')+'><h3>חשבון</h3></div>'+
     '<div class="surface"><div class="row between" style="gap:12px"><span class="muted small">מחובר כ־</span><span class="num small">'+esc(email)+'</span></div>'+
     '<button class="btn ghost full" style="margin-top:12px" data-a="signout">יציאה מהחשבון</button></div>';
   h+='<div class="sec-h"><h3>קטגוריות</h3></div>';
@@ -1074,7 +1128,7 @@ function viewSettings(){
     '<div class="row" style="gap:10px;margin-top:12px"><button class="btn ghost grow" data-a="bk" data-v="export">ייצוא גיבוי</button><button class="btn ghost grow" data-a="bk" data-v="import">ייבוא מקובץ</button></div></div>';
   h+='<div class="sec-h"><h3>מחיקת נתונים</h3></div><div class="surface"><button class="btn danger ghost full" data-a="reset">מחיקת כל הנתונים</button></div>';
   h+='<p class="foot">הנתונים שלך פרטיים ומסונכרנים בין המכשירים.<br>'+
-    (S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות, '+S.nw.history.length+' נקודות בגרף</p>';
+    (S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות, '+S.nw.history.length+' נקודות בגרף<br>גרסה '+APP_VERSION+(ENV==='beta'?' · סביבת בדיקה':'')+'</p>';
   return h;
 }
 
@@ -1335,18 +1389,48 @@ async function openStatsSheet(){
 }
 
 /* ================= backup ================= */
+/* ייצוא בשני שלבים: קודם מכינים את הקובץ (קריאה מהשרת), ואז המשתמש לוחץ "שמירת הקובץ".
+   באייפון חלון השיתוף נפתח רק ישירות מלחיצה, ולא אחרי המתנה לשרת. */
 async function doExport(){
   toast('מכין גיבוי…');
   let all;
-  try{all=await D.allTx();}catch(e){console.error(e);toast('אין חיבור, אי אפשר לייצא גיבוי כרגע','err');return;}
+  try{
+    all=await Promise.race([D.allTx(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000))]);
+  }catch(e){console.error(e);toast('אין חיבור או שהשרת לא הגיב, נסו שוב','err');return;}
   const data={app:'personal-finance-dashboard',version:2,exportedAt:new Date().toISOString(),tx:{categories:S.tx.categories,transactions:all},nw:S.nw};
   const name='finance-backup-'+todayStr()+'.json';
   const file=new File([JSON.stringify(data,null,2)],name,{type:'application/json'});
+  S.form={kind:'export',file};
+  openSheet(sheetHead('הגיבוי מוכן')+
+    '<p class="muted" style="line-height:1.6">'+F.n0.format(all.length)+' תנועות, '+S.tx.categories.length+' קטגוריות, '+
+    (S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות ו־'+S.nw.history.length+' נקודות בגרף.</p>'+
+    '<p class="hint">בחלון שייפתח אפשר לבחור "שמירה בקבצים" (iCloud) או לשלוח לעצמך.</p>'+
+    '<div class="sheet-actions"><button class="btn primary grow" data-a="bk-save" data-primary>שמירת הקובץ</button></div>');
+}
+function saveExport(){
+  const f=S.form;if(!f||f.kind!=='export')return;
+  const file=f.file;
+  let canShare=false;
+  try{canShare=!!(navigator.canShare&&navigator.share&&navigator.canShare({files:[file]}));}catch(e){}
+  if(canShare){
+    // נקרא ישירות מהלחיצה, בלי await לפניו
+    navigator.share({files:[file],title:file.name})
+      .then(()=>{closeSheet();toast('הגיבוי נשמר');})
+      .catch(e=>{
+        if(e&&e.name==='AbortError')return;
+        console.error(e);
+        downloadExport(file,true);
+      });
+    return;
+  }
+  downloadExport(file,false);
+}
+function downloadExport(file,afterShareFail){
   try{
-    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return;}
-  }catch(e){if(e&&e.name==='AbortError')return;}
-  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=file.name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }catch(e){console.error(e);}
+  toast(afterShareFail?'חלון השיתוף לא נפתח. אם הקובץ לא ירד, נסו מ-Safari':'אם לא נפתח חלון שמירה, נסו מ-Safari','err');
 }
 async function importFile(file){
   let obj;
@@ -1436,7 +1520,24 @@ document.addEventListener('click',async e=>{
     }
 
     case 'bk':if(v==='export')doExport();else $('#file').click();break;
+    case 'bk-save':saveExport();break;
     case 'stats':openStatsSheet();break;
+    case 'beta-copy':{
+      if(ENV!=='beta')break;
+      if(!await askConfirm('להחליף את נתוני הבדיקה בעותק של הנתונים האמיתיים? הנתונים האמיתיים לא ישתנו.',{ok:'העתקה'}))break;
+      toast('מעתיק…');
+      try{const n=await D.betaCopyFromProd();toast('הועתקו '+n+' מסמכים לסביבת הבדיקה');}
+      catch(err){console.error(err);toast('ההעתקה נכשלה (צריך חיבור לאינטרנט)','err');}
+      break;
+    }
+    case 'beta-wipe':{
+      if(ENV!=='beta')break;
+      if(!await askConfirm('למחוק את כל נתוני הבדיקה? הנתונים האמיתיים לא ישתנו.',{ok:'ניקוי',danger:true}))break;
+      toast('מנקה…');
+      try{const n=await D.betaWipe();toast('נוקו '+n+' מסמכים מסביבת הבדיקה');}
+      catch(err){console.error(err);toast('הניקוי נכשל (צריך חיבור לאינטרנט)','err');}
+      break;
+    }
     case 'signout':{
       if(!await askConfirm('לצאת מהחשבון?',{ok:'יציאה'}))break;
       try{D.stop();await D.signOut();}catch(err){console.error(err);toast('היציאה נכשלה','err');}
@@ -1497,6 +1598,12 @@ function wantsQuickAdd(){
   return false;
 }
 (async function init(){
+  if(ENV==='beta'){
+    document.body.classList.add('beta');
+    document.body.insertAdjacentHTML('afterbegin','<div class="beta-bar" role="note">סביבת בדיקה · גרסה '+APP_VERSION+' · הנתונים נפרדים מהאמיתיים</div>');
+    document.title='בדיקה · הכסף שלי';
+    const mt=document.querySelector('meta[name="apple-mobile-web-app-title"]');if(mt)mt.setAttribute('content','בדיקה');
+  }
   S.quick=wantsQuickAdd();
   if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
   try{await D.init();}

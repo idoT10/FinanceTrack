@@ -1,7 +1,9 @@
 // Service worker: פותח את האפליקציה גם בלי אינטרנט.
-// קבצי האתר: קודם מהרשת (כדי שגרסה חדשה תופיע מיד), ואם הרשת איטית או נופלת, מהמטמון.
+// אותו קובץ משמש גם את /beta/. שם המטמון נגזר מהתיקייה, כדי שהייצור והבדיקה לא ימחקו זה לזה את המטמון.
+// קבצי האתר: קודם מהרשת (גרסה חדשה מופיעה מיד), ואם הרשת איטית או נופלת, מהמטמון.
 // ספריות Firebase (גרסה קבועה): קודם מהמטמון. הנתונים עצמם נשמרים במטמון של Firestore, לא כאן.
-const CACHE = 'finance-shell-v3';
+const ENV_TAG = self.registration.scope.includes('/beta/') ? '-beta' : '-prod';
+const CACHE = 'finance-shell-v4' + ENV_TAG;
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 const CDN_HOSTS = ['www.gstatic.com'];
 
@@ -9,7 +11,9 @@ self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  // מוחקים רק מטמונים ישנים של אותה סביבה (ובייצור גם מטמונים מגרסאות לפני ההפרדה)
+  const mine = k => k.endsWith(ENV_TAG) || (ENV_TAG === '-prod' && /^finance-shell-v\d+$/.test(k));
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => mine(k) && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 function networkFirst(req) {
@@ -17,7 +21,7 @@ function networkFirst(req) {
     let done = false;
     const finish = res => { if (!done && res) { done = true; resolve(res); } };
     const timer = setTimeout(() => {
-      caches.match(req, {ignoreSearch: true}).then(finish);
+      caches.open(CACHE).then(c => c.match(req, {ignoreSearch: true})).then(finish);
     }, 3000);
     fetch(req).then(res => {
       clearTimeout(timer);
@@ -25,8 +29,8 @@ function networkFirst(req) {
       finish(res);
     }).catch(() => {
       clearTimeout(timer);
-      caches.match(req, {ignoreSearch: true})
-        .then(r => r || caches.match('./'))
+      caches.open(CACHE)
+        .then(c => c.match(req, {ignoreSearch: true}).then(r => r || c.match('./')))
         .then(r => { if (!done) { done = true; resolve(r || Response.error()); } });
     });
   });
