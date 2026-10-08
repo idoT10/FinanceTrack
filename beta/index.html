@@ -259,6 +259,7 @@ body.lock .toast{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 14px)}
 .bulk-total b{font-size:20px}
 
 /* חיווי סנכרון */
+.sync.waiting,.sync.syncing{cursor:pointer}
 .sync{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:650;background:var(--sunk);color:var(--ink-2);white-space:nowrap}
 .sync::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
 .sync.syncing::before{animation:pulse .9s ease-in-out infinite alternate}
@@ -274,7 +275,7 @@ body.beta .gate{padding-top:36px}
 </head>
 <body>
 <div class="app">
-  <header class="top"><div class="row between"><h1 id="top-title">הכסף שלי</h1><span class="sync hidden" id="sync" role="status" aria-live="polite"></span></div><div class="sub" id="top-sub">&nbsp;</div></header>
+  <header class="top"><div class="row between"><h1 id="top-title">הכסף שלי</h1><span class="sync hidden" id="sync" role="status" aria-live="polite" data-a="sync-retry"></span></div><div class="sub" id="top-sub">&nbsp;</div></header>
   <main id="view">
     <div class="skel" style="height:150px"></div>
     <div class="skel" style="height:260px;border-radius:26px"></div>
@@ -626,17 +627,24 @@ const D={
   },
   delHist(t){this.w(this.F.deleteDoc(this.ref('history',String(t))));},
   bulk(ups,pt){
-    const b=this.F.writeBatch(this.db);
-    ups.forEach(u=>b.update(this.ref(this.itemCol(u.kind),u.id),{value:u.value,updatedAt:u.updatedAt}));
-    if(pt)b.set(this.ref('history',String(pt.t)),pt);
-    this.w(b.commit());
+    const ops=ups.map(u=>({ref:this.ref(this.itemCol(u.kind),u.id),update:true,data:{value:u.value,updatedAt:u.updatedAt}}));
+    if(pt)ops.push({ref:this.ref('history',String(pt.t)),data:pt});
+    this.w(this.runOps(ops));
   },
+  /* כל כתיבה בודקת את allowlist בכללי האבטחה (קריאת exists אחת), ו-Firestore מגביל batch ל-20 קריאות כאלה.
+     לכן כותבים ב-batch-ים קטנים של 10, עד 4 במקביל. */
   async runOps(ops){
-    for(let i=0;i<ops.length;i+=400){
-      const b=this.F.writeBatch(this.db);
-      ops.slice(i,i+400).forEach(o=>{if(o.del)b.delete(o.ref);else b.set(o.ref,o.data);});
-      await b.commit();
-    }
+    const SIZE=10,PAR=4,chunks=[];
+    for(let i=0;i<ops.length;i+=SIZE)chunks.push(ops.slice(i,i+SIZE));
+    let next=0;
+    const worker=async()=>{
+      while(next<chunks.length){
+        const ch=chunks[next++],b=this.F.writeBatch(this.db);
+        ch.forEach(o=>{if(o.del)b.delete(o.ref);else if(o.update)b.update(o.ref,o.data);else b.set(o.ref,o.data);});
+        await b.commit();
+      }
+    };
+    await Promise.all(Array.from({length:Math.min(PAR,chunks.length)},worker));
   },
   async importAll(tx,nw){
     syncBegin();
@@ -663,7 +671,7 @@ const D={
     old.liabs.forEach(id=>ops.push({ref:this.ref('liabilities',id),del:true}));
     old.hist.forEach(id=>ops.push({ref:this.ref('history',id),del:true}));
     cats.forEach(c=>{const {id,...r}=c;ops.push({ref:this.ref('categories',id),data:r});});
-    try{await this.runOps(ops);}catch(e){this.fail(e);}
+    try{await this.runOps(ops);}catch(e){console.error(e);toast('המחיקה לא הושלמה ('+(e&&e.code||'שגיאה')+'). נסו שוב','err');}
   },
   /* ---- כלים לסביבת הבדיקה בלבד. קוראים מהייצור, אף פעם לא כותבים אליו ---- */
   async readAll(env){
@@ -699,6 +707,10 @@ const D={
       await this.runOps(ops);
       return ops.length;
     }finally{syncEnd();}
+  },
+  async reconnect(){
+    try{await this.F.disableNetwork(this.db);}catch(e){}
+    try{await this.F.enableNetwork(this.db);}catch(e){console.error(e);}
   },
   signOut(){return this.A.signOut(this.auth);}
 };
@@ -1439,7 +1451,7 @@ async function importFile(file){
   const tx=normTx(obj.tx),nw=normNw(obj.nw);
   const msg='לייבא '+tx.transactions.length+' תנועות, '+tx.categories.length+' קטגוריות, '+(nw.assets.length+nw.liabilities.length)+' נכסים והתחייבויות ו־'+nw.history.length+' נקודות בגרף? פריטים עם אותו מזהה יתעדכנו, והשאר יישארו כמו שהם.';
   if(!await askConfirm(msg,{ok:'ייבוא'}))return;
-  try{await D.importAll(tx,nw);toast('הייבוא הושלם');}catch(e){D.fail(e);}
+  try{await D.importAll(tx,nw);toast('הייבוא הושלם');}catch(e){console.error(e);toast('הייבוא לא הושלם ('+(e&&e.code||'שגיאה')+'). אפשר לייבא שוב, פריטים קיימים יתעדכנו','err');}
 }
 
 /* ================= events ================= */
@@ -1522,12 +1534,13 @@ document.addEventListener('click',async e=>{
     case 'bk':if(v==='export')doExport();else $('#file').click();break;
     case 'bk-save':saveExport();break;
     case 'stats':openStatsSheet();break;
+    case 'sync-retry':if(SYNC.n>0){toast('מתחבר מחדש…');D.reconnect();}break;
     case 'beta-copy':{
       if(ENV!=='beta')break;
       if(!await askConfirm('להחליף את נתוני הבדיקה בעותק של הנתונים האמיתיים? הנתונים האמיתיים לא ישתנו.',{ok:'העתקה'}))break;
       toast('מעתיק…');
       try{const n=await D.betaCopyFromProd();toast('הועתקו '+n+' מסמכים לסביבת הבדיקה');}
-      catch(err){console.error(err);toast('ההעתקה נכשלה (צריך חיבור לאינטרנט)','err');}
+      catch(err){console.error(err);toast('ההעתקה נכשלה ('+(err&&err.code||'אין חיבור')+')','err');}
       break;
     }
     case 'beta-wipe':{
@@ -1535,7 +1548,7 @@ document.addEventListener('click',async e=>{
       if(!await askConfirm('למחוק את כל נתוני הבדיקה? הנתונים האמיתיים לא ישתנו.',{ok:'ניקוי',danger:true}))break;
       toast('מנקה…');
       try{const n=await D.betaWipe();toast('נוקו '+n+' מסמכים מסביבת הבדיקה');}
-      catch(err){console.error(err);toast('הניקוי נכשל (צריך חיבור לאינטרנט)','err');}
+      catch(err){console.error(err);toast('הניקוי נכשל ('+(err&&err.code||'אין חיבור')+')','err');}
       break;
     }
     case 'signout':{
@@ -1586,7 +1599,7 @@ document.addEventListener('keydown',e=>{
 if(window.visualViewport){window.visualViewport.addEventListener('resize',fitSheet);window.visualViewport.addEventListener('scroll',fitSheet);}
 let rz;
 window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(S.ready){const pts=rangePoints();$$('#view [data-chart]').forEach(el=>drawChart(el,pts));}},150);});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.ready)render();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready)render();});
 window.addEventListener('online',()=>{syncUpdate();if(S.ready)render();});
 window.addEventListener('offline',()=>{syncUpdate();if(S.ready)render();});
 
