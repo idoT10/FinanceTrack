@@ -1444,14 +1444,99 @@ function downloadExport(file,afterShareFail){
   }catch(e){console.error(e);}
   toast(afterShareFail?'חלון השיתוף לא נפתח. אם הקובץ לא ירד, נסו מ-Safari':'אם לא נפתח חלון שמירה, נסו מ-Safari','err');
 }
+/* ================= ייבוא חכם =================
+   מוסיף רק מה שחסר. לא מוחק ולא דורס: כשפריט קיים גם בחשבון וגם בגיבוי, הגרסה שבחשבון נשמרת.
+   "קיים" = אותו מזהה, ואם אין מזהה תואם, אותו תוכן (שם/תאריך/סכום/הערה). */
+const nkey=v=>String(v==null?'':v).trim().replace(/\s+/g,' ').toLowerCase();
+const txKey=t=>t.type+'|'+t.date+'|'+r2(+t.amount)+'|'+nkey(t.note);
+const histDay=t=>{const d=new Date(+t);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();};
+function planImport(bTx,bNw,cur){
+  const add={categories:[],transactions:[],assets:[],liabilities:[],history:[]};
+  const st={catsLinked:0,txSkip:0,itemsSkip:0,histSkip:0};
+  // קטגוריות: לפי מזהה, אחר כך לפי סוג+שם
+  const catIds=new Set(cur.cats.map(c=>c.id)),catByKey=new Map(cur.cats.map(c=>[c.type+'|'+nkey(c.name),c])),catMap=new Map();
+  for(const c of bTx.categories){
+    if(catIds.has(c.id)){catMap.set(c.id,c.id);st.catsLinked++;continue;}
+    const k=c.type+'|'+nkey(c.name),hit=catByKey.get(k);
+    if(hit){catMap.set(c.id,hit.id);st.catsLinked++;continue;}
+    add.categories.push(c);catIds.add(c.id);catByKey.set(k,c);catMap.set(c.id,c.id);
+  }
+  const catById=new Map([...cur.cats,...add.categories].map(c=>[c.id,c]));
+  // תנועות: לפי מזהה, אחר כך לפי תוכן, כולל ספירה (שתי תנועות זהות בגיבוי מול אחת בחשבון = מוסיפים אחת)
+  const txIds=new Set(cur.tx.map(t=>t.id)),cnt=new Map();
+  cur.tx.forEach(t=>{const k=txKey(t);cnt.set(k,(cnt.get(k)||0)+1);});
+  for(const t of bTx.transactions){
+    if(txIds.has(t.id)){st.txSkip++;continue;}
+    const k=txKey(t),n=cnt.get(k)||0;
+    if(n>0){cnt.set(k,n-1);st.txSkip++;continue;}
+    const cid=t.categoryId&&catMap.has(t.categoryId)?catMap.get(t.categoryId):null;
+    const c=cid?catById.get(cid):null;
+    add.transactions.push(Object.assign({},t,{categoryId:cid,catName:c?c.name:t.catName}));
+    txIds.add(t.id);
+  }
+  // נכסים והתחייבויות: לפי מזהה, אחר כך לפי קטגוריה+שם
+  const items=(list,existing,out)=>{
+    const ids=new Set(existing.map(x=>x.id)),keys=new Set(existing.map(x=>x.category+'|'+nkey(x.name)));
+    for(const x of list){
+      const k=x.category+'|'+nkey(x.name);
+      if(ids.has(x.id)||keys.has(k)){st.itemsSkip++;continue;}
+      out.push(x);ids.add(x.id);keys.add(k);
+    }
+  };
+  items(bNw.assets,cur.assets,add.assets);items(bNw.liabilities,cur.liabs,add.liabilities);
+  // נקודות בגרף: אותו רגע, או אותו יום עם אותם סכומים
+  const ts=new Set(cur.hist.map(p=>p.t)),dk=new Set(cur.hist.map(p=>histDay(p.t)+'|'+r2(p.a)+'|'+r2(p.l)));
+  for(const p of bNw.history){
+    const k=histDay(p.t)+'|'+r2(p.a)+'|'+r2(p.l);
+    if(ts.has(p.t)||dk.has(k)){st.histSkip++;continue;}
+    add.history.push(p);ts.add(p.t);dk.add(k);
+  }
+  const total=add.categories.length+add.transactions.length+add.assets.length+add.liabilities.length+add.history.length;
+  return{add,st,total};
+}
+function isPristine(cur){
+  if(cur.tx.length||cur.assets.length||cur.liabs.length||cur.hist.length)return false;
+  if(cur.cats.length!==DEFAULT_CATS.length)return false;
+  const def=new Set(DEFAULT_CATS.map(([name,icon,type])=>type+'|'+nkey(name)));
+  return cur.cats.every(c=>def.has(c.type+'|'+nkey(c.name)));
+}
+function importSummary(plan){
+  const a=plan.add,st=plan.st,rows=[];
+  const row=(label,addN,skipN)=>{if(addN||skipN)rows.push('<div class="row between" style="padding:7px 2px;border-bottom:1px solid var(--line)"><span>'+label+'</span><span class="num small"><b>'+F.n0.format(addN)+'</b> חדשים'+(skipN?' · <span class="muted">'+F.n0.format(skipN)+' קיימים</span>':'')+'</span></div>');};
+  row('תנועות',a.transactions.length,st.txSkip);
+  row('קטגוריות',a.categories.length,st.catsLinked);
+  row('נכסים והתחייבויות',a.assets.length+a.liabilities.length,st.itemsSkip);
+  row('נקודות בגרף',a.history.length,st.histSkip);
+  return rows.join('');
+}
+async function runImport(plan){
+  toast('מייבא…');
+  try{
+    const a=plan.add;
+    await D.importAll({categories:a.categories,transactions:a.transactions},{assets:a.assets,liabilities:a.liabilities,history:a.history});
+    toast('נוספו '+F.n0.format(plan.total)+' פריטים מהגיבוי');
+  }catch(e){console.error(e);toast('הייבוא לא הושלם ('+(e&&e.code||'שגיאה')+'). אפשר לייבא שוב, מה שכבר נוסף ידולג','err');}
+}
 async function importFile(file){
   let obj;
   try{obj=JSON.parse(await file.text());}catch(e){toast('הקובץ אינו גיבוי תקין','err');return;}
   if(!obj||typeof obj!=='object'||!obj.tx||!obj.nw){toast('הקובץ אינו גיבוי של הדשבורד','err');return;}
-  const tx=normTx(obj.tx),nw=normNw(obj.nw);
-  const msg='לייבא '+tx.transactions.length+' תנועות, '+tx.categories.length+' קטגוריות, '+(nw.assets.length+nw.liabilities.length)+' נכסים והתחייבויות ו־'+nw.history.length+' נקודות בגרף? פריטים עם אותו מזהה יתעדכנו, והשאר יישארו כמו שהם.';
-  if(!await askConfirm(msg,{ok:'ייבוא'}))return;
-  try{await D.importAll(tx,nw);toast('הייבוא הושלם');}catch(e){console.error(e);toast('הייבוא לא הושלם ('+(e&&e.code||'שגיאה')+'). אפשר לייבא שוב, פריטים קיימים יתעדכנו','err');}
+  const bTx=normTx(obj.tx),bNw=normNw(obj.nw);
+  toast('בודק מה כבר קיים…');
+  let curTx;
+  try{
+    curTx=await Promise.race([D.allTx(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000))]);
+  }catch(e){console.error(e);toast('הייבוא דורש חיבור לאינטרנט','err');return;}
+  const cur={cats:S.tx.categories,tx:curTx,assets:S.nw.assets,liabs:S.nw.liabilities,hist:S.nw.history};
+  const plan=planImport(bTx,bNw,cur);
+  if(!plan.total){toast('כל מה שבגיבוי כבר קיים בחשבון');return;}
+  // חשבון ריק (רק קטגוריות ברירת המחדל): אין מה לדרוס, מייבאים מיד
+  if(isPristine(cur)){await runImport(plan);return;}
+  S.form={kind:'import',plan};
+  openSheet(sheetHead('ייבוא מגיבוי')+
+    '<div class="banner" style="margin:4px 0 12px">בחשבון כבר יש נתונים. יתווסף רק מה שחסר. כשפריט קיים גם בחשבון וגם בגיבוי, הגרסה שבחשבון נשמרת והגיבוי לא דורס אותה. תנועה שערכת אחרי הגיבוי (סכום או הערה) עלולה להיראות חדשה ולהתווסף.</div>'+
+    importSummary(plan)+
+    '<div class="sheet-actions"><button class="btn ghost" data-a="sheet-close">ביטול</button><button class="btn primary grow" data-a="import-go" data-primary>הוספת '+F.n0.format(plan.total)+' פריטים</button></div>');
 }
 
 /* ================= events ================= */
@@ -1533,6 +1618,7 @@ document.addEventListener('click',async e=>{
 
     case 'bk':if(v==='export')doExport();else $('#file').click();break;
     case 'bk-save':saveExport();break;
+    case 'import-go':{if(!f||f.kind!=='import')break;const plan=f.plan;closeSheet();await runImport(plan);break;}
     case 'stats':openStatsSheet();break;
     case 'sync-retry':if(SYNC.n>0){toast('מתחבר מחדש…');D.reconnect();}break;
     case 'beta-copy':{
