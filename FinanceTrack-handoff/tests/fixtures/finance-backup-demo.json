@@ -1,0 +1,4090 @@
+{
+  "app": "personal-finance-dashboard",
+  "version": 2,
+  "exportedAt": "2026-10-11T22:50:00+03:00",
+  "tx": {
+    "categories": [
+      {
+        "id": "demo-cat-super",
+        "name": "סופר",
+        "icon": "🛒",
+        "type": "expense",
+        "color": "#4E9A5F",
+        "ord": 1
+      },
+      {
+        "id": "demo-cat-eat",
+        "name": "אוכל בחוץ",
+        "icon": "☕",
+        "type": "expense",
+        "color": "#D0663A",
+        "ord": 2
+      },
+      {
+        "id": "demo-cat-car",
+        "name": "תחבורה ודלק",
+        "icon": "🚗",
+        "type": "expense",
+        "color": "#3F6FB5",
+        "ord": 3
+      },
+      {
+        "id": "demo-cat-home",
+        "name": "דיור וחשבונות",
+        "icon": "🏠",
+        "type": "expense",
+        "color": "#B3568A",
+        "ord": 4
+      },
+      {
+        "id": "demo-cat-fun",
+        "name": "פנאי",
+        "icon": "🎬",
+        "type": "expense",
+        "color": "#7153A8",
+        "ord": 5
+      },
+      {
+        "id": "demo-cat-shop",
+        "name": "קניות",
+        "icon": "🛍️",
+        "type": "expense",
+        "color": "#C83E52",
+        "ord": 6
+      },
+      {
+        "id": "demo-cat-salary",
+        "name": "משכורת",
+        "icon": "💼",
+        "type": "income",
+        "color": "#2A98A8",
+        "ord": 7
+      },
+      {
+        "id": "demo-cat-extra",
+        "name": "הכנסה נוספת",
+        "icon": "✨",
+        "type": "income",
+        "color": "#C9A12E",
+        "ord": 8
+      },
+      {
+        "id": "demo-cat-subs",
+        "name": "מנויים",
+        "icon": "📱",
+        "type": "expense",
+        "color": "#2A98A8",
+        "ord": 9
+      },
+      {
+        "id": "demo-cat-health",
+        "name": "בריאות",
+        "icon": "💊",
+        "type": "expense",
+        "color": "#4E9A5F",
+        "ord": 10
+      },
+      {
+        "id": "demo-cat-pet",
+        "name": "חיות מחמד",
+        "icon": "🐶",
+        "type": "expense",
+        "color": "#C9A12E",
+        "ord": 11
+      },
+      {
+        "id": "demo-cat-gift",
+        "name": "מתנות",
+        "icon": "🎁",
+        "type": "expense",
+        "color": "#B3568A",
+        "ord": 12
+      },
+      {
+        "id": "demo-cat-refund",
+        "name": "החזרים",
+        "icon": "🧾",
+        "type": "income",
+        "color": "#7C8580",
+        "ord": 13
+      }
+    ],
+    "transactions": [
+      {
+        "id": "demo-tx-0002",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-01",
+        "note": "קפה",
+        "createdAt": 1775019742000
+      },
+      {
+        "id": "demo-tx-0001",
+        "type": "expense",
+        "amount": 4800,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-04-01",
+        "note": "שכירות",
+        "createdAt": 1775025082000
+      },
+      {
+        "id": "demo-tx-0003",
+        "type": "expense",
+        "amount": 99,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-04-02",
+        "note": "אינטרנט",
+        "createdAt": 1775105648000
+      },
+      {
+        "id": "demo-tx-0004",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-02",
+        "note": "קפה",
+        "createdAt": 1775106896000
+      },
+      {
+        "id": "demo-tx-0006",
+        "type": "expense",
+        "amount": 536.0,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-04-03",
+        "note": "יוחננוף",
+        "createdAt": 1775206462000
+      },
+      {
+        "id": "demo-tx-0005",
+        "type": "expense",
+        "amount": 195,
+        "categoryId": "demo-cat-pet",
+        "catName": "חיות מחמד",
+        "date": "2026-04-03",
+        "note": "אוכל לכלב",
+        "createdAt": 1775233369000
+      },
+      {
+        "id": "demo-tx-0007",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-03",
+        "note": "קפה",
+        "createdAt": 1775233684000
+      },
+      {
+        "id": "demo-tx-0009",
+        "type": "expense",
+        "amount": 288.29,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-04-04",
+        "note": "דלק",
+        "createdAt": 1775287374000
+      },
+      {
+        "id": "demo-tx-0008",
+        "type": "expense",
+        "amount": 123,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-04",
+        "note": "ארוחת צהריים",
+        "createdAt": 1775313135000
+      },
+      {
+        "id": "demo-tx-0010",
+        "type": "expense",
+        "amount": 21.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-04-05",
+        "note": "ספוטיפיי",
+        "createdAt": 1775358821000
+      },
+      {
+        "id": "demo-tx-0011",
+        "type": "expense",
+        "amount": 54.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-04-05",
+        "note": "נטפליקס",
+        "createdAt": 1775359547000
+      },
+      {
+        "id": "demo-tx-0012",
+        "type": "expense",
+        "amount": 459.3,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-04-05",
+        "note": "יוחננוף",
+        "createdAt": 1775369079000
+      },
+      {
+        "id": "demo-tx-0013",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-05",
+        "note": "קפה",
+        "createdAt": 1775378999000
+      },
+      {
+        "id": "demo-tx-0014",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-06",
+        "note": "קפה",
+        "createdAt": 1775458727000
+      },
+      {
+        "id": "demo-tx-0015",
+        "type": "expense",
+        "amount": 347.5,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-04-07",
+        "note": "מכולת",
+        "createdAt": 1775542914000
+      },
+      {
+        "id": "demo-tx-0017",
+        "type": "expense",
+        "amount": 103,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-07",
+        "note": "סושי",
+        "createdAt": 1775564359000
+      },
+      {
+        "id": "demo-tx-0016",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-07",
+        "note": "קפה",
+        "createdAt": 1775566103000
+      },
+      {
+        "id": "demo-tx-0018",
+        "type": "expense",
+        "amount": 11,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-04-07",
+        "note": "רב-קו",
+        "createdAt": 1775581349000
+      },
+      {
+        "id": "demo-tx-0019",
+        "type": "expense",
+        "amount": 11.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-04-08",
+        "note": "iCloud",
+        "createdAt": 1775620273000
+      },
+      {
+        "id": "demo-tx-0020",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-08",
+        "note": "קפה",
+        "createdAt": 1775652380000
+      },
+      {
+        "id": "demo-tx-0021",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-09",
+        "note": "קפה",
+        "createdAt": 1775711622000
+      },
+      {
+        "id": "demo-tx-0022",
+        "type": "expense",
+        "amount": 172,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-09",
+        "note": "ארוחת צהריים",
+        "createdAt": 1775751560000
+      },
+      {
+        "id": "demo-tx-0023",
+        "type": "income",
+        "amount": 14500,
+        "categoryId": "demo-cat-salary",
+        "catName": "משכורת",
+        "date": "2026-04-10",
+        "note": "משכורת אפריל",
+        "createdAt": 1775799958000
+      },
+      {
+        "id": "demo-tx-0024",
+        "type": "expense",
+        "amount": 494.1,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-04-10",
+        "note": "",
+        "createdAt": 1775843964000
+      },
+      {
+        "id": "demo-tx-0025",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-11",
+        "note": "קפה",
+        "createdAt": 1775922574000
+      },
+      {
+        "id": "demo-tx-0026",
+        "type": "expense",
+        "amount": 186,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-11",
+        "note": "מסעדה",
+        "createdAt": 1775928323000
+      },
+      {
+        "id": "demo-tx-0028",
+        "type": "expense",
+        "amount": 175,
+        "categoryId": "demo-cat-gift",
+        "catName": "מתנות",
+        "date": "2026-04-12",
+        "note": "מתנה לאמא",
+        "createdAt": 1775979976000
+      },
+      {
+        "id": "demo-tx-0027",
+        "type": "expense",
+        "amount": 648,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-04-12",
+        "note": "ארנונה",
+        "createdAt": 1775980011000
+      },
+      {
+        "id": "demo-tx-0029",
+        "type": "expense",
+        "amount": 311,
+        "categoryId": "demo-cat-gift",
+        "catName": "מתנות",
+        "date": "2026-04-13",
+        "note": "מתנה ליום הולדת",
+        "createdAt": 1776105394000
+      },
+      {
+        "id": "demo-tx-0030",
+        "type": "expense",
+        "amount": 526.5,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-04-14",
+        "note": "רמי לוי",
+        "createdAt": 1776146537000
+      },
+      {
+        "id": "demo-tx-0032",
+        "type": "expense",
+        "amount": 352.16,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-04-14",
+        "note": "דלק",
+        "createdAt": 1776183501000
+      },
+      {
+        "id": "demo-tx-0031",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-14",
+        "note": "קפה",
+        "createdAt": 1776191449000
+      },
+      {
+        "id": "demo-tx-0033",
+        "type": "expense",
+        "amount": 199,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-04-15",
+        "note": "חדר כושר",
+        "createdAt": 1776224545000
+      },
+      {
+        "id": "demo-tx-0035",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-17",
+        "note": "קפה",
+        "createdAt": 1776437223000
+      },
+      {
+        "id": "demo-tx-0034",
+        "type": "expense",
+        "amount": 245.5,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-04-17",
+        "note": "",
+        "createdAt": 1776446993000
+      },
+      {
+        "id": "demo-tx-0362",
+        "type": "income",
+        "amount": 620,
+        "categoryId": "demo-cat-extra",
+        "catName": "הכנסה נוספת",
+        "date": "2026-04-18",
+        "note": "מכירה ביד 2 – אופניים",
+        "createdAt": 1776491926000
+      },
+      {
+        "id": "demo-tx-0036",
+        "type": "expense",
+        "amount": 276,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-04-18",
+        "note": "איקאה",
+        "createdAt": 1776499291000
+      },
+      {
+        "id": "demo-tx-0037",
+        "type": "expense",
+        "amount": 224.1,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-04-19",
+        "note": "",
+        "createdAt": 1776607371000
+      },
+      {
+        "id": "demo-tx-0038",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-19",
+        "note": "קפה",
+        "createdAt": 1776613434000
+      },
+      {
+        "id": "demo-tx-0040",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-20",
+        "note": "קפה",
+        "createdAt": 1776664372000
+      },
+      {
+        "id": "demo-tx-0039",
+        "type": "expense",
+        "amount": 497,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-04-20",
+        "note": "חשמל",
+        "createdAt": 1776708888000
+      },
+      {
+        "id": "demo-tx-0041",
+        "type": "expense",
+        "amount": 165,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-20",
+        "note": "סושי",
+        "createdAt": 1776714248000
+      },
+      {
+        "id": "demo-tx-0042",
+        "type": "expense",
+        "amount": 514.6,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-04-21",
+        "note": "מכולת",
+        "createdAt": 1776767462000
+      },
+      {
+        "id": "demo-tx-0043",
+        "type": "expense",
+        "amount": 230,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-04-23",
+        "note": "הופעה",
+        "createdAt": 1776926098000
+      },
+      {
+        "id": "demo-tx-0045",
+        "type": "expense",
+        "amount": 336.1,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-04-24",
+        "note": "דלק",
+        "createdAt": 1777014328000
+      },
+      {
+        "id": "demo-tx-0044",
+        "type": "expense",
+        "amount": 679.9,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-04-24",
+        "note": "יוחננוף",
+        "createdAt": 1777051928000
+      },
+      {
+        "id": "demo-tx-0046",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-25",
+        "note": "קפה",
+        "createdAt": 1777119638000
+      },
+      {
+        "id": "demo-tx-0047",
+        "type": "expense",
+        "amount": 63,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-25",
+        "note": "פיצה",
+        "createdAt": 1777126312000
+      },
+      {
+        "id": "demo-tx-0048",
+        "type": "expense",
+        "amount": 382.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-04-26",
+        "note": "רמי לוי",
+        "createdAt": 1777213457000
+      },
+      {
+        "id": "demo-tx-0050",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-28",
+        "note": "קפה",
+        "createdAt": 1777372118000
+      },
+      {
+        "id": "demo-tx-0049",
+        "type": "expense",
+        "amount": 543.6,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-04-28",
+        "note": "",
+        "createdAt": 1777397438000
+      },
+      {
+        "id": "demo-tx-0051",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-29",
+        "note": "קפה",
+        "createdAt": 1777457374000
+      },
+      {
+        "id": "demo-tx-0052",
+        "type": "expense",
+        "amount": 200,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-04-29",
+        "note": "בירה עם חברים",
+        "createdAt": 1777467617000
+      },
+      {
+        "id": "demo-tx-0053",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-04-30",
+        "note": "קפה",
+        "createdAt": 1777546338000
+      },
+      {
+        "id": "demo-tx-0054",
+        "type": "expense",
+        "amount": 122,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-04-30",
+        "note": "איקאה",
+        "createdAt": 1777558153000
+      },
+      {
+        "id": "demo-tx-0058",
+        "type": "expense",
+        "amount": 160,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-05-01",
+        "note": "קולנוע",
+        "createdAt": 1777617865000
+      },
+      {
+        "id": "demo-tx-0055",
+        "type": "expense",
+        "amount": 4800,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-05-01",
+        "note": "שכירות",
+        "createdAt": 1777617978000
+      },
+      {
+        "id": "demo-tx-0057",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-01",
+        "note": "קפה",
+        "createdAt": 1777623558000
+      },
+      {
+        "id": "demo-tx-0056",
+        "type": "expense",
+        "amount": 559.3,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-05-01",
+        "note": "",
+        "createdAt": 1777649383000
+      },
+      {
+        "id": "demo-tx-0059",
+        "type": "expense",
+        "amount": 99,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-05-02",
+        "note": "אינטרנט",
+        "createdAt": 1777695642000
+      },
+      {
+        "id": "demo-tx-0060",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-02",
+        "note": "קפה",
+        "createdAt": 1777732330000
+      },
+      {
+        "id": "demo-tx-0061",
+        "type": "expense",
+        "amount": 190,
+        "categoryId": "demo-cat-pet",
+        "catName": "חיות מחמד",
+        "date": "2026-05-03",
+        "note": "אוכל לכלב",
+        "createdAt": 1777823258000
+      },
+      {
+        "id": "demo-tx-0062",
+        "type": "expense",
+        "amount": 354.33,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-05-04",
+        "note": "דלק",
+        "createdAt": 1777904893000
+      },
+      {
+        "id": "demo-tx-0063",
+        "type": "expense",
+        "amount": 21.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-05-05",
+        "note": "ספוטיפיי",
+        "createdAt": 1777950655000
+      },
+      {
+        "id": "demo-tx-0064",
+        "type": "expense",
+        "amount": 54.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-05-05",
+        "note": "נטפליקס",
+        "createdAt": 1777951627000
+      },
+      {
+        "id": "demo-tx-0066",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-05",
+        "note": "קפה",
+        "createdAt": 1777963326000
+      },
+      {
+        "id": "demo-tx-0068",
+        "type": "expense",
+        "amount": 85,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-05-05",
+        "note": "באולינג",
+        "createdAt": 1777965620000
+      },
+      {
+        "id": "demo-tx-0067",
+        "type": "expense",
+        "amount": 5.5,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-05-05",
+        "note": "רב-קו",
+        "createdAt": 1777970204000
+      },
+      {
+        "id": "demo-tx-0065",
+        "type": "expense",
+        "amount": 435.0,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-05-05",
+        "note": "מכולת",
+        "createdAt": 1778004667000
+      },
+      {
+        "id": "demo-tx-0069",
+        "type": "expense",
+        "amount": 230,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-05-06",
+        "note": "חדר בריחה",
+        "createdAt": 1778083678000
+      },
+      {
+        "id": "demo-tx-0070",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-07",
+        "note": "קפה",
+        "createdAt": 1778131020000
+      },
+      {
+        "id": "demo-tx-0071",
+        "type": "expense",
+        "amount": 11.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-05-08",
+        "note": "iCloud",
+        "createdAt": 1778210760000
+      },
+      {
+        "id": "demo-tx-0073",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-08",
+        "note": "קפה",
+        "createdAt": 1778246885000
+      },
+      {
+        "id": "demo-tx-0072",
+        "type": "expense",
+        "amount": 538.1,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-05-08",
+        "note": "",
+        "createdAt": 1778250367000
+      },
+      {
+        "id": "demo-tx-0074",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-09",
+        "note": "קפה",
+        "createdAt": 1778328498000
+      },
+      {
+        "id": "demo-tx-0075",
+        "type": "income",
+        "amount": 14500,
+        "categoryId": "demo-cat-salary",
+        "catName": "משכורת",
+        "date": "2026-05-10",
+        "note": "משכורת מאי",
+        "createdAt": 1778391435000
+      },
+      {
+        "id": "demo-tx-0077",
+        "type": "expense",
+        "amount": 90,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-10",
+        "note": "ארוחת צהריים",
+        "createdAt": 1778414294000
+      },
+      {
+        "id": "demo-tx-0078",
+        "type": "expense",
+        "amount": 5.5,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-05-10",
+        "note": "רב-קו",
+        "createdAt": 1778418417000
+      },
+      {
+        "id": "demo-tx-0076",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-10",
+        "note": "קפה",
+        "createdAt": 1778439182000
+      },
+      {
+        "id": "demo-tx-0079",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-11",
+        "note": "קפה",
+        "createdAt": 1778483393000
+      },
+      {
+        "id": "demo-tx-0082",
+        "type": "expense",
+        "amount": 407,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-05-11",
+        "note": "בגדים",
+        "createdAt": 1778486652000
+      },
+      {
+        "id": "demo-tx-0080",
+        "type": "expense",
+        "amount": 112,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-11",
+        "note": "שווארמה",
+        "createdAt": 1778486831000
+      },
+      {
+        "id": "demo-tx-0373",
+        "type": "expense",
+        "amount": 75,
+        "categoryId": null,
+        "catName": "",
+        "date": "2026-05-11",
+        "note": "",
+        "createdAt": 1778508509000
+      },
+      {
+        "id": "demo-tx-0081",
+        "type": "expense",
+        "amount": 8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-05-11",
+        "note": "רב-קו",
+        "createdAt": 1778513847000
+      },
+      {
+        "id": "demo-tx-0083",
+        "type": "expense",
+        "amount": 320.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-05-12",
+        "note": "",
+        "createdAt": 1778562309000
+      },
+      {
+        "id": "demo-tx-0085",
+        "type": "expense",
+        "amount": 340.23,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-05-14",
+        "note": "דלק",
+        "createdAt": 1778737471000
+      },
+      {
+        "id": "demo-tx-0084",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-14",
+        "note": "קפה",
+        "createdAt": 1778761472000
+      },
+      {
+        "id": "demo-tx-0086",
+        "type": "expense",
+        "amount": 293,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-05-14",
+        "note": "הופעה",
+        "createdAt": 1778775053000
+      },
+      {
+        "id": "demo-tx-0087",
+        "type": "expense",
+        "amount": 199,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-05-15",
+        "note": "חדר כושר",
+        "createdAt": 1778815008000
+      },
+      {
+        "id": "demo-tx-0088",
+        "type": "expense",
+        "amount": 492.5,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-05-15",
+        "note": "מכולת",
+        "createdAt": 1778835027000
+      },
+      {
+        "id": "demo-tx-0089",
+        "type": "expense",
+        "amount": 153,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-16",
+        "note": "ארוחת צהריים",
+        "createdAt": 1778925096000
+      },
+      {
+        "id": "demo-tx-0090",
+        "type": "expense",
+        "amount": 375,
+        "categoryId": "demo-cat-gift",
+        "catName": "מתנות",
+        "date": "2026-05-17",
+        "note": "חתונה",
+        "createdAt": 1778995557000
+      },
+      {
+        "id": "demo-tx-0093",
+        "type": "expense",
+        "amount": 5.5,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-05-19",
+        "note": "רב-קו",
+        "createdAt": 1779188008000
+      },
+      {
+        "id": "demo-tx-0092",
+        "type": "expense",
+        "amount": 151,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-19",
+        "note": "ארוחת צהריים",
+        "createdAt": 1779190549000
+      },
+      {
+        "id": "demo-tx-0091",
+        "type": "expense",
+        "amount": 241.5,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-05-19",
+        "note": "יוחננוף",
+        "createdAt": 1779193713000
+      },
+      {
+        "id": "demo-tx-0097",
+        "type": "expense",
+        "amount": 11,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-05-20",
+        "note": "רב-קו",
+        "createdAt": 1779261122000
+      },
+      {
+        "id": "demo-tx-0096",
+        "type": "expense",
+        "amount": 264.02,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-05-20",
+        "note": "דלק",
+        "createdAt": 1779266699000
+      },
+      {
+        "id": "demo-tx-0095",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-20",
+        "note": "קפה",
+        "createdAt": 1779287983000
+      },
+      {
+        "id": "demo-tx-0094",
+        "type": "expense",
+        "amount": 202,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-05-20",
+        "note": "מים",
+        "createdAt": 1779306462000
+      },
+      {
+        "id": "demo-tx-0098",
+        "type": "expense",
+        "amount": 577.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-05-22",
+        "note": "רמי לוי",
+        "createdAt": 1779451296000
+      },
+      {
+        "id": "demo-tx-0100",
+        "type": "expense",
+        "amount": 157,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-22",
+        "note": "מסעדה",
+        "createdAt": 1779456110000
+      },
+      {
+        "id": "demo-tx-0099",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-22",
+        "note": "קפה",
+        "createdAt": 1779465231000
+      },
+      {
+        "id": "demo-tx-0363",
+        "type": "income",
+        "amount": 1840,
+        "categoryId": "demo-cat-refund",
+        "catName": "החזרים",
+        "date": "2026-05-22",
+        "note": "החזר מס",
+        "createdAt": 1779475988000
+      },
+      {
+        "id": "demo-tx-0101",
+        "type": "expense",
+        "amount": 250.64,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-05-24",
+        "note": "דלק",
+        "createdAt": 1779634430000
+      },
+      {
+        "id": "demo-tx-0102",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-25",
+        "note": "קפה",
+        "createdAt": 1779692755000
+      },
+      {
+        "id": "demo-tx-0103",
+        "type": "expense",
+        "amount": 11,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-05-25",
+        "note": "רב-קו",
+        "createdAt": 1779722374000
+      },
+      {
+        "id": "demo-tx-0104",
+        "type": "expense",
+        "amount": 532,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-05-25",
+        "note": "בגדים",
+        "createdAt": 1779722634000
+      },
+      {
+        "id": "demo-tx-0105",
+        "type": "expense",
+        "amount": 223.7,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-05-26",
+        "note": "שופרסל",
+        "createdAt": 1779773072000
+      },
+      {
+        "id": "demo-tx-0106",
+        "type": "expense",
+        "amount": 84,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-27",
+        "note": "המבורגר",
+        "createdAt": 1779910236000
+      },
+      {
+        "id": "demo-tx-0108",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-29",
+        "note": "קפה",
+        "createdAt": 1780033559000
+      },
+      {
+        "id": "demo-tx-0107",
+        "type": "expense",
+        "amount": 166.7,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-05-29",
+        "note": "שופרסל",
+        "createdAt": 1780070018000
+      },
+      {
+        "id": "demo-tx-0109",
+        "type": "expense",
+        "amount": 140,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-05-31",
+        "note": "מסעדה",
+        "createdAt": 1780229404000
+      },
+      {
+        "id": "demo-tx-0110",
+        "type": "expense",
+        "amount": 4800,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-06-01",
+        "note": "שכירות",
+        "createdAt": 1780296981000
+      },
+      {
+        "id": "demo-tx-0111",
+        "type": "expense",
+        "amount": 130,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-01",
+        "note": "פיצה",
+        "createdAt": 1780306341000
+      },
+      {
+        "id": "demo-tx-0112",
+        "type": "expense",
+        "amount": 99,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-06-02",
+        "note": "אינטרנט",
+        "createdAt": 1780376396000
+      },
+      {
+        "id": "demo-tx-0115",
+        "type": "expense",
+        "amount": 247.19,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-06-02",
+        "note": "דלק",
+        "createdAt": 1780377857000
+      },
+      {
+        "id": "demo-tx-0113",
+        "type": "expense",
+        "amount": 457.3,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-02",
+        "note": "רמי לוי",
+        "createdAt": 1780398756000
+      },
+      {
+        "id": "demo-tx-0114",
+        "type": "expense",
+        "amount": 86,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-02",
+        "note": "המבורגר",
+        "createdAt": 1780422577000
+      },
+      {
+        "id": "demo-tx-0117",
+        "type": "expense",
+        "amount": 5.5,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-06-03",
+        "note": "רב-קו",
+        "createdAt": 1780467065000
+      },
+      {
+        "id": "demo-tx-0116",
+        "type": "expense",
+        "amount": 162,
+        "categoryId": "demo-cat-pet",
+        "catName": "חיות מחמד",
+        "date": "2026-06-03",
+        "note": "אוכל לכלב",
+        "createdAt": 1780508141000
+      },
+      {
+        "id": "demo-tx-0118",
+        "type": "expense",
+        "amount": 65,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-04",
+        "note": "סושי",
+        "createdAt": 1780568704000
+      },
+      {
+        "id": "demo-tx-0119",
+        "type": "expense",
+        "amount": 317.89,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-06-04",
+        "note": "דלק",
+        "createdAt": 1780580609000
+      },
+      {
+        "id": "demo-tx-0120",
+        "type": "expense",
+        "amount": 21.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-06-05",
+        "note": "ספוטיפיי",
+        "createdAt": 1780628795000
+      },
+      {
+        "id": "demo-tx-0121",
+        "type": "expense",
+        "amount": 54.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-06-05",
+        "note": "נטפליקס",
+        "createdAt": 1780631573000
+      },
+      {
+        "id": "demo-tx-0122",
+        "type": "expense",
+        "amount": 161.8,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-05",
+        "note": "שופרסל",
+        "createdAt": 1780677254000
+      },
+      {
+        "id": "demo-tx-0123",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-06",
+        "note": "קפה",
+        "createdAt": 1780722203000
+      },
+      {
+        "id": "demo-tx-0124",
+        "type": "expense",
+        "amount": 262.29,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-06-06",
+        "note": "דלק",
+        "createdAt": 1780764805000
+      },
+      {
+        "id": "demo-tx-0125",
+        "type": "expense",
+        "amount": 11.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-06-08",
+        "note": "iCloud",
+        "createdAt": 1780890977000
+      },
+      {
+        "id": "demo-tx-0126",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-08",
+        "note": "קפה",
+        "createdAt": 1780932877000
+      },
+      {
+        "id": "demo-tx-0129",
+        "type": "expense",
+        "amount": 148,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-09",
+        "note": "מסעדה",
+        "createdAt": 1780995442000
+      },
+      {
+        "id": "demo-tx-0127",
+        "type": "expense",
+        "amount": 578.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-09",
+        "note": "שופרסל",
+        "createdAt": 1781014915000
+      },
+      {
+        "id": "demo-tx-0364",
+        "type": "expense",
+        "amount": 5400,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-06-09",
+        "note": "מחשב נייד",
+        "createdAt": 1781017190000
+      },
+      {
+        "id": "demo-tx-0128",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-09",
+        "note": "קפה",
+        "createdAt": 1781018213000
+      },
+      {
+        "id": "demo-tx-0130",
+        "type": "expense",
+        "amount": 77.9,
+        "categoryId": "demo-cat-health",
+        "catName": "בריאות",
+        "date": "2026-06-09",
+        "note": "רופא שיניים",
+        "createdAt": 1781022617000
+      },
+      {
+        "id": "demo-tx-0131",
+        "type": "income",
+        "amount": 14500,
+        "categoryId": "demo-cat-salary",
+        "catName": "משכורת",
+        "date": "2026-06-10",
+        "note": "משכורת יוני",
+        "createdAt": 1781067940000
+      },
+      {
+        "id": "demo-tx-0133",
+        "type": "expense",
+        "amount": 409,
+        "categoryId": "demo-cat-gift",
+        "catName": "מתנות",
+        "date": "2026-06-10",
+        "note": "מתנה לאמא",
+        "createdAt": 1781069186000
+      },
+      {
+        "id": "demo-tx-0365",
+        "type": "income",
+        "amount": 2500,
+        "categoryId": "demo-cat-extra",
+        "catName": "הכנסה נוספת",
+        "date": "2026-06-10",
+        "note": "בונוס",
+        "createdAt": 1781078316000
+      },
+      {
+        "id": "demo-tx-0132",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-10",
+        "note": "קפה",
+        "createdAt": 1781113593000
+      },
+      {
+        "id": "demo-tx-0134",
+        "type": "expense",
+        "amount": 648,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-06-12",
+        "note": "ארנונה",
+        "createdAt": 1781256560000
+      },
+      {
+        "id": "demo-tx-0135",
+        "type": "expense",
+        "amount": 146.0,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-12",
+        "note": "",
+        "createdAt": 1781271077000
+      },
+      {
+        "id": "demo-tx-0136",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-12",
+        "note": "קפה",
+        "createdAt": 1781278701000
+      },
+      {
+        "id": "demo-tx-0137",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-13",
+        "note": "קפה",
+        "createdAt": 1781337187000
+      },
+      {
+        "id": "demo-tx-0139",
+        "type": "expense",
+        "amount": 191,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-06-13",
+        "note": "באולינג",
+        "createdAt": 1781350359000
+      },
+      {
+        "id": "demo-tx-0138",
+        "type": "expense",
+        "amount": 286.27,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-06-13",
+        "note": "דלק",
+        "createdAt": 1781377732000
+      },
+      {
+        "id": "demo-tx-0142",
+        "type": "expense",
+        "amount": 242.45,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-06-14",
+        "note": "דלק",
+        "createdAt": 1781418377000
+      },
+      {
+        "id": "demo-tx-0141",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-14",
+        "note": "קפה",
+        "createdAt": 1781431352000
+      },
+      {
+        "id": "demo-tx-0140",
+        "type": "expense",
+        "amount": 385.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-14",
+        "note": "שופרסל",
+        "createdAt": 1781465569000
+      },
+      {
+        "id": "demo-tx-0143",
+        "type": "expense",
+        "amount": 199,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-06-15",
+        "note": "חדר כושר",
+        "createdAt": 1781495806000
+      },
+      {
+        "id": "demo-tx-0144",
+        "type": "expense",
+        "amount": 5.5,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-06-15",
+        "note": "רב-קו",
+        "createdAt": 1781513726000
+      },
+      {
+        "id": "demo-tx-0146",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-16",
+        "note": "קפה",
+        "createdAt": 1781608708000
+      },
+      {
+        "id": "demo-tx-0145",
+        "type": "expense",
+        "amount": 316.1,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-16",
+        "note": "מכולת",
+        "createdAt": 1781626464000
+      },
+      {
+        "id": "demo-tx-0147",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-17",
+        "note": "קפה",
+        "createdAt": 1781674055000
+      },
+      {
+        "id": "demo-tx-0149",
+        "type": "expense",
+        "amount": 128,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-06-18",
+        "note": "קולנוע",
+        "createdAt": 1781802982000
+      },
+      {
+        "id": "demo-tx-0148",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-18",
+        "note": "קפה",
+        "createdAt": 1781809016000
+      },
+      {
+        "id": "demo-tx-0150",
+        "type": "expense",
+        "amount": 495.0,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-19",
+        "note": "יוחננוף",
+        "createdAt": 1781886860000
+      },
+      {
+        "id": "demo-tx-0151",
+        "type": "expense",
+        "amount": 507,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-06-20",
+        "note": "חשמל",
+        "createdAt": 1781967736000
+      },
+      {
+        "id": "demo-tx-0154",
+        "type": "expense",
+        "amount": 578,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-06-21",
+        "note": "בגדים",
+        "createdAt": 1782027831000
+      },
+      {
+        "id": "demo-tx-0152",
+        "type": "expense",
+        "amount": 294.1,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-21",
+        "note": "רמי לוי",
+        "createdAt": 1782038935000
+      },
+      {
+        "id": "demo-tx-0375",
+        "type": "expense",
+        "amount": 119,
+        "categoryId": "demo-cat-deleted",
+        "catName": "ספרים",
+        "date": "2026-06-21",
+        "note": "ספר",
+        "createdAt": 1782048778000
+      },
+      {
+        "id": "demo-tx-0153",
+        "type": "expense",
+        "amount": 8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-06-21",
+        "note": "רב-קו",
+        "createdAt": 1782051991000
+      },
+      {
+        "id": "demo-tx-0155",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-22",
+        "note": "קפה",
+        "createdAt": 1782120913000
+      },
+      {
+        "id": "demo-tx-0156",
+        "type": "expense",
+        "amount": 153,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-22",
+        "note": "פיצה",
+        "createdAt": 1782123258000
+      },
+      {
+        "id": "demo-tx-0158",
+        "type": "expense",
+        "amount": 445,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-06-23",
+        "note": "בגדים",
+        "createdAt": 1782198524000
+      },
+      {
+        "id": "demo-tx-0157",
+        "type": "expense",
+        "amount": 616.0,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-23",
+        "note": "רמי לוי",
+        "createdAt": 1782204465000
+      },
+      {
+        "id": "demo-tx-0159",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-24",
+        "note": "קפה",
+        "createdAt": 1782306539000
+      },
+      {
+        "id": "demo-tx-0160",
+        "type": "expense",
+        "amount": 349.8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-06-24",
+        "note": "דלק",
+        "createdAt": 1782309949000
+      },
+      {
+        "id": "demo-tx-0162",
+        "type": "expense",
+        "amount": 11,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-06-25",
+        "note": "רב-קו",
+        "createdAt": 1782379062000
+      },
+      {
+        "id": "demo-tx-0161",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-25",
+        "note": "קפה",
+        "createdAt": 1782416648000
+      },
+      {
+        "id": "demo-tx-0164",
+        "type": "expense",
+        "amount": 48,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-26",
+        "note": "ארוחת צהריים",
+        "createdAt": 1782454999000
+      },
+      {
+        "id": "demo-tx-0163",
+        "type": "expense",
+        "amount": 258.8,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-26",
+        "note": "מכולת",
+        "createdAt": 1782482780000
+      },
+      {
+        "id": "demo-tx-0165",
+        "type": "expense",
+        "amount": 254,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-06-26",
+        "note": "בירה עם חברים",
+        "createdAt": 1782497047000
+      },
+      {
+        "id": "demo-tx-0167",
+        "type": "expense",
+        "amount": 128.1,
+        "categoryId": "demo-cat-health",
+        "catName": "בריאות",
+        "date": "2026-06-27",
+        "note": "רופא שיניים",
+        "createdAt": 1782565774000
+      },
+      {
+        "id": "demo-tx-0166",
+        "type": "expense",
+        "amount": 167,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-27",
+        "note": "שווארמה",
+        "createdAt": 1782584202000
+      },
+      {
+        "id": "demo-tx-0170",
+        "type": "expense",
+        "amount": 188,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-28",
+        "note": "המבורגר",
+        "createdAt": 1782623341000
+      },
+      {
+        "id": "demo-tx-0169",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-28",
+        "note": "קפה",
+        "createdAt": 1782652801000
+      },
+      {
+        "id": "demo-tx-0168",
+        "type": "expense",
+        "amount": 373.8,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-28",
+        "note": "שופרסל",
+        "createdAt": 1782676470000
+      },
+      {
+        "id": "demo-tx-0171",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-06-29",
+        "note": "קפה",
+        "createdAt": 1782748493000
+      },
+      {
+        "id": "demo-tx-0172",
+        "type": "expense",
+        "amount": 169.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-06-30",
+        "note": "מכולת",
+        "createdAt": 1782806651000
+      },
+      {
+        "id": "demo-tx-0173",
+        "type": "expense",
+        "amount": 4800,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-07-01",
+        "note": "שכירות",
+        "createdAt": 1782888584000
+      },
+      {
+        "id": "demo-tx-0174",
+        "type": "expense",
+        "amount": 436,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-07-01",
+        "note": "בגדים",
+        "createdAt": 1782913125000
+      },
+      {
+        "id": "demo-tx-0175",
+        "type": "expense",
+        "amount": 99,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-07-02",
+        "note": "אינטרנט",
+        "createdAt": 1782965714000
+      },
+      {
+        "id": "demo-tx-0177",
+        "type": "expense",
+        "amount": 177,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-07-02",
+        "note": "חדר בריחה",
+        "createdAt": 1782980915000
+      },
+      {
+        "id": "demo-tx-0176",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-02",
+        "note": "קפה",
+        "createdAt": 1783020593000
+      },
+      {
+        "id": "demo-tx-0179",
+        "type": "expense",
+        "amount": 668.3,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-07-03",
+        "note": "מכולת",
+        "createdAt": 1783056260000
+      },
+      {
+        "id": "demo-tx-0178",
+        "type": "expense",
+        "amount": 172,
+        "categoryId": "demo-cat-pet",
+        "catName": "חיות מחמד",
+        "date": "2026-07-03",
+        "note": "אוכל לכלב",
+        "createdAt": 1783072411000
+      },
+      {
+        "id": "demo-tx-0366",
+        "type": "expense",
+        "amount": 3200,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-07-03",
+        "note": "חופשה באילת",
+        "createdAt": 1783087438000
+      },
+      {
+        "id": "demo-tx-0181",
+        "type": "expense",
+        "amount": 307.58,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-07-04",
+        "note": "דלק",
+        "createdAt": 1783153948000
+      },
+      {
+        "id": "demo-tx-0180",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-04",
+        "note": "קפה",
+        "createdAt": 1783163000000
+      },
+      {
+        "id": "demo-tx-0182",
+        "type": "expense",
+        "amount": 21.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-07-05",
+        "note": "ספוטיפיי",
+        "createdAt": 1783220695000
+      },
+      {
+        "id": "demo-tx-0183",
+        "type": "expense",
+        "amount": 54.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-07-05",
+        "note": "נטפליקס",
+        "createdAt": 1783222456000
+      },
+      {
+        "id": "demo-tx-0184",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-05",
+        "note": "קפה",
+        "createdAt": 1783248341000
+      },
+      {
+        "id": "demo-tx-0185",
+        "type": "expense",
+        "amount": 631,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-07-05",
+        "note": "",
+        "createdAt": 1783269597000
+      },
+      {
+        "id": "demo-tx-0186",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-06",
+        "note": "קפה",
+        "createdAt": 1783338526000
+      },
+      {
+        "id": "demo-tx-0188",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-07",
+        "note": "קפה",
+        "createdAt": 1783408654000
+      },
+      {
+        "id": "demo-tx-0187",
+        "type": "expense",
+        "amount": 450.5,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-07-07",
+        "note": "יוחננוף",
+        "createdAt": 1783417501000
+      },
+      {
+        "id": "demo-tx-0189",
+        "type": "expense",
+        "amount": 11.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-07-08",
+        "note": "iCloud",
+        "createdAt": 1783482574000
+      },
+      {
+        "id": "demo-tx-0190",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-09",
+        "note": "קפה",
+        "createdAt": 1783579627000
+      },
+      {
+        "id": "demo-tx-0191",
+        "type": "income",
+        "amount": 14500,
+        "categoryId": "demo-cat-salary",
+        "catName": "משכורת",
+        "date": "2026-07-10",
+        "note": "משכורת יולי",
+        "createdAt": 1783662384000
+      },
+      {
+        "id": "demo-tx-0192",
+        "type": "expense",
+        "amount": 252.2,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-07-10",
+        "note": "יוחננוף",
+        "createdAt": 1783664693000
+      },
+      {
+        "id": "demo-tx-0193",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-10",
+        "note": "קפה",
+        "createdAt": 1783680459000
+      },
+      {
+        "id": "demo-tx-0194",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-11",
+        "note": "קפה",
+        "createdAt": 1783746632000
+      },
+      {
+        "id": "demo-tx-0196",
+        "type": "expense",
+        "amount": 135,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-07-11",
+        "note": "קולנוע",
+        "createdAt": 1783757120000
+      },
+      {
+        "id": "demo-tx-0195",
+        "type": "expense",
+        "amount": 132,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-11",
+        "note": "סושי",
+        "createdAt": 1783793707000
+      },
+      {
+        "id": "demo-tx-0197",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-12",
+        "note": "קפה",
+        "createdAt": 1783848496000
+      },
+      {
+        "id": "demo-tx-0201",
+        "type": "expense",
+        "amount": 96,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-07-14",
+        "note": "חדר בריחה",
+        "createdAt": 1784014801000
+      },
+      {
+        "id": "demo-tx-0198",
+        "type": "expense",
+        "amount": 473.2,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-07-14",
+        "note": "מכולת",
+        "createdAt": 1784026028000
+      },
+      {
+        "id": "demo-tx-0200",
+        "type": "expense",
+        "amount": 327.43,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-07-14",
+        "note": "דלק",
+        "createdAt": 1784026029000
+      },
+      {
+        "id": "demo-tx-0199",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-14",
+        "note": "קפה",
+        "createdAt": 1784030270000
+      },
+      {
+        "id": "demo-tx-0367",
+        "type": "income",
+        "amount": 180,
+        "categoryId": "demo-cat-refund",
+        "catName": "החזרים",
+        "date": "2026-07-14",
+        "note": "החזר על מוצר פגום",
+        "createdAt": 1784046049000
+      },
+      {
+        "id": "demo-tx-0202",
+        "type": "expense",
+        "amount": 199,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-07-15",
+        "note": "חדר כושר",
+        "createdAt": 1784085807000
+      },
+      {
+        "id": "demo-tx-0203",
+        "type": "expense",
+        "amount": 99,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-15",
+        "note": "סושי",
+        "createdAt": 1784123988000
+      },
+      {
+        "id": "demo-tx-0204",
+        "type": "expense",
+        "amount": 298.5,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-07-17",
+        "note": "יוחננוף",
+        "createdAt": 1784268022000
+      },
+      {
+        "id": "demo-tx-0206",
+        "type": "expense",
+        "amount": 244,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-07-17",
+        "note": "הופעה",
+        "createdAt": 1784269027000
+      },
+      {
+        "id": "demo-tx-0205",
+        "type": "expense",
+        "amount": 125,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-17",
+        "note": "פיצה",
+        "createdAt": 1784303644000
+      },
+      {
+        "id": "demo-tx-0207",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-18",
+        "note": "קפה",
+        "createdAt": 1784365802000
+      },
+      {
+        "id": "demo-tx-0208",
+        "type": "expense",
+        "amount": 200,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-07-20",
+        "note": "מים",
+        "createdAt": 1784547320000
+      },
+      {
+        "id": "demo-tx-0209",
+        "type": "expense",
+        "amount": 301.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-07-21",
+        "note": "מכולת",
+        "createdAt": 1784638053000
+      },
+      {
+        "id": "demo-tx-0210",
+        "type": "expense",
+        "amount": 106,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-22",
+        "note": "פיצה",
+        "createdAt": 1784697769000
+      },
+      {
+        "id": "demo-tx-0211",
+        "type": "expense",
+        "amount": 8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-07-22",
+        "note": "רב-קו",
+        "createdAt": 1784747016000
+      },
+      {
+        "id": "demo-tx-0212",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-23",
+        "note": "קפה",
+        "createdAt": 1784785479000
+      },
+      {
+        "id": "demo-tx-0214",
+        "type": "expense",
+        "amount": 343,
+        "categoryId": "demo-cat-gift",
+        "catName": "מתנות",
+        "date": "2026-07-23",
+        "note": "מתנה ליום הולדת",
+        "createdAt": 1784791341000
+      },
+      {
+        "id": "demo-tx-0213",
+        "type": "expense",
+        "amount": 84,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-07-23",
+        "note": "בירה עם חברים",
+        "createdAt": 1784832466000
+      },
+      {
+        "id": "demo-tx-0215",
+        "type": "expense",
+        "amount": 585.6,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-07-24",
+        "note": "רמי לוי",
+        "createdAt": 1784876628000
+      },
+      {
+        "id": "demo-tx-0216",
+        "type": "expense",
+        "amount": 316.14,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-07-24",
+        "note": "דלק",
+        "createdAt": 1784901460000
+      },
+      {
+        "id": "demo-tx-0218",
+        "type": "expense",
+        "amount": 358,
+        "categoryId": "demo-cat-gift",
+        "catName": "מתנות",
+        "date": "2026-07-25",
+        "note": "מתנה לאמא",
+        "createdAt": 1784956927000
+      },
+      {
+        "id": "demo-tx-0217",
+        "type": "expense",
+        "amount": 66,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-25",
+        "note": "מסעדה",
+        "createdAt": 1784979667000
+      },
+      {
+        "id": "demo-tx-0219",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-27",
+        "note": "קפה",
+        "createdAt": 1785181081000
+      },
+      {
+        "id": "demo-tx-0220",
+        "type": "expense",
+        "amount": 399.9,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-07-28",
+        "note": "יוחננוף",
+        "createdAt": 1785219487000
+      },
+      {
+        "id": "demo-tx-0221",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-30",
+        "note": "קפה",
+        "createdAt": 1785402646000
+      },
+      {
+        "id": "demo-tx-0222",
+        "type": "expense",
+        "amount": 101,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-30",
+        "note": "ארוחת צהריים",
+        "createdAt": 1785420920000
+      },
+      {
+        "id": "demo-tx-0226",
+        "type": "expense",
+        "amount": 40.6,
+        "categoryId": "demo-cat-health",
+        "catName": "בריאות",
+        "date": "2026-07-31",
+        "note": "בית מרקחת",
+        "createdAt": 1785482475000
+      },
+      {
+        "id": "demo-tx-0225",
+        "type": "expense",
+        "amount": 97,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-31",
+        "note": "מסעדה",
+        "createdAt": 1785488079000
+      },
+      {
+        "id": "demo-tx-0223",
+        "type": "expense",
+        "amount": 337.0,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-07-31",
+        "note": "יוחננוף",
+        "createdAt": 1785493341000
+      },
+      {
+        "id": "demo-tx-0224",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-07-31",
+        "note": "קפה",
+        "createdAt": 1785497902000
+      },
+      {
+        "id": "demo-tx-0227",
+        "type": "expense",
+        "amount": 4800,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-08-01",
+        "note": "שכירות",
+        "createdAt": 1785565847000
+      },
+      {
+        "id": "demo-tx-0228",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-01",
+        "note": "קפה",
+        "createdAt": 1785596645000
+      },
+      {
+        "id": "demo-tx-0229",
+        "type": "expense",
+        "amount": 99,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-08-02",
+        "note": "אינטרנט",
+        "createdAt": 1785644771000
+      },
+      {
+        "id": "demo-tx-0230",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-02",
+        "note": "קפה",
+        "createdAt": 1785663086000
+      },
+      {
+        "id": "demo-tx-0231",
+        "type": "expense",
+        "amount": 76,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-08-02",
+        "note": "קולנוע",
+        "createdAt": 1785683574000
+      },
+      {
+        "id": "demo-tx-0233",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-03",
+        "note": "קפה",
+        "createdAt": 1785750559000
+      },
+      {
+        "id": "demo-tx-0232",
+        "type": "expense",
+        "amount": 176,
+        "categoryId": "demo-cat-pet",
+        "catName": "חיות מחמד",
+        "date": "2026-08-03",
+        "note": "אוכל לכלב",
+        "createdAt": 1785776559000
+      },
+      {
+        "id": "demo-tx-0234",
+        "type": "expense",
+        "amount": 292.1,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-08-04",
+        "note": "רמי לוי",
+        "createdAt": 1785827473000
+      },
+      {
+        "id": "demo-tx-0235",
+        "type": "expense",
+        "amount": 331.59,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-08-04",
+        "note": "דלק",
+        "createdAt": 1785861719000
+      },
+      {
+        "id": "demo-tx-0236",
+        "type": "expense",
+        "amount": 21.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-08-05",
+        "note": "ספוטיפיי",
+        "createdAt": 1785899446000
+      },
+      {
+        "id": "demo-tx-0237",
+        "type": "expense",
+        "amount": 54.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-08-05",
+        "note": "נטפליקס",
+        "createdAt": 1785900710000
+      },
+      {
+        "id": "demo-tx-0372",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-06",
+        "note": "קפה",
+        "createdAt": 1785992589000
+      },
+      {
+        "id": "demo-tx-0371",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-06",
+        "note": "קפה",
+        "createdAt": 1785995483000
+      },
+      {
+        "id": "demo-tx-0238",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-06",
+        "note": "קפה",
+        "createdAt": 1786008230000
+      },
+      {
+        "id": "demo-tx-0240",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-07",
+        "note": "קפה",
+        "createdAt": 1786083957000
+      },
+      {
+        "id": "demo-tx-0239",
+        "type": "expense",
+        "amount": 261.8,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-08-07",
+        "note": "יוחננוף",
+        "createdAt": 1786121839000
+      },
+      {
+        "id": "demo-tx-0241",
+        "type": "expense",
+        "amount": 11.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-08-08",
+        "note": "iCloud",
+        "createdAt": 1786160425000
+      },
+      {
+        "id": "demo-tx-0242",
+        "type": "expense",
+        "amount": 152,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-08",
+        "note": "המבורגר",
+        "createdAt": 1786208594000
+      },
+      {
+        "id": "demo-tx-0243",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-09",
+        "note": "קפה",
+        "createdAt": 1786274520000
+      },
+      {
+        "id": "demo-tx-0244",
+        "type": "income",
+        "amount": 14500,
+        "categoryId": "demo-cat-salary",
+        "catName": "משכורת",
+        "date": "2026-08-10",
+        "note": "משכורת אוגוסט",
+        "createdAt": 1786341169000
+      },
+      {
+        "id": "demo-tx-0245",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-10",
+        "note": "קפה",
+        "createdAt": 1786361535000
+      },
+      {
+        "id": "demo-tx-0246",
+        "type": "expense",
+        "amount": 641.5,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-08-11",
+        "note": "",
+        "createdAt": 1786424909000
+      },
+      {
+        "id": "demo-tx-0247",
+        "type": "expense",
+        "amount": 648,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-08-12",
+        "note": "ארנונה",
+        "createdAt": 1786547318000
+      },
+      {
+        "id": "demo-tx-0248",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-13",
+        "note": "קפה",
+        "createdAt": 1786625849000
+      },
+      {
+        "id": "demo-tx-0251",
+        "type": "expense",
+        "amount": 349.08,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-08-14",
+        "note": "דלק",
+        "createdAt": 1786707540000
+      },
+      {
+        "id": "demo-tx-0250",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-14",
+        "note": "קפה",
+        "createdAt": 1786718575000
+      },
+      {
+        "id": "demo-tx-0249",
+        "type": "expense",
+        "amount": 442.9,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-08-14",
+        "note": "שופרסל",
+        "createdAt": 1786732500000
+      },
+      {
+        "id": "demo-tx-0252",
+        "type": "expense",
+        "amount": 199,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-08-15",
+        "note": "חדר כושר",
+        "createdAt": 1786766312000
+      },
+      {
+        "id": "demo-tx-0254",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-16",
+        "note": "קפה",
+        "createdAt": 1786885255000
+      },
+      {
+        "id": "demo-tx-0253",
+        "type": "expense",
+        "amount": 143.8,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-08-16",
+        "note": "יוחננוף",
+        "createdAt": 1786887372000
+      },
+      {
+        "id": "demo-tx-0256",
+        "type": "expense",
+        "amount": 5.5,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-08-17",
+        "note": "רב-קו",
+        "createdAt": 1786956741000
+      },
+      {
+        "id": "demo-tx-0255",
+        "type": "expense",
+        "amount": 102,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-17",
+        "note": "המבורגר",
+        "createdAt": 1786991298000
+      },
+      {
+        "id": "demo-tx-0259",
+        "type": "expense",
+        "amount": 114,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-18",
+        "note": "פיצה",
+        "createdAt": 1787029371000
+      },
+      {
+        "id": "demo-tx-0258",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-18",
+        "note": "קפה",
+        "createdAt": 1787034329000
+      },
+      {
+        "id": "demo-tx-0260",
+        "type": "expense",
+        "amount": 8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-08-18",
+        "note": "רב-קו",
+        "createdAt": 1787037835000
+      },
+      {
+        "id": "demo-tx-0257",
+        "type": "expense",
+        "amount": 552.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-08-18",
+        "note": "מכולת",
+        "createdAt": 1787082102000
+      },
+      {
+        "id": "demo-tx-0262",
+        "type": "expense",
+        "amount": 223,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-08-19",
+        "note": "קולנוע",
+        "createdAt": 1787132187000
+      },
+      {
+        "id": "demo-tx-0263",
+        "type": "expense",
+        "amount": 77.6,
+        "categoryId": "demo-cat-health",
+        "catName": "בריאות",
+        "date": "2026-08-19",
+        "note": "בית מרקחת",
+        "createdAt": 1787147539000
+      },
+      {
+        "id": "demo-tx-0261",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-19",
+        "note": "קפה",
+        "createdAt": 1787151046000
+      },
+      {
+        "id": "demo-tx-0264",
+        "type": "expense",
+        "amount": 447,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-08-20",
+        "note": "חשמל",
+        "createdAt": 1787214900000
+      },
+      {
+        "id": "demo-tx-0266",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-21",
+        "note": "קפה",
+        "createdAt": 1787289408000
+      },
+      {
+        "id": "demo-tx-0267",
+        "type": "expense",
+        "amount": 102,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-21",
+        "note": "ארוחת צהריים",
+        "createdAt": 1787299201000
+      },
+      {
+        "id": "demo-tx-0265",
+        "type": "expense",
+        "amount": 665.7,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-08-21",
+        "note": "מכולת",
+        "createdAt": 1787306072000
+      },
+      {
+        "id": "demo-tx-0269",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-23",
+        "note": "קפה",
+        "createdAt": 1787464876000
+      },
+      {
+        "id": "demo-tx-0271",
+        "type": "expense",
+        "amount": 274,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-08-23",
+        "note": "באולינג",
+        "createdAt": 1787492831000
+      },
+      {
+        "id": "demo-tx-0270",
+        "type": "expense",
+        "amount": 156,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-23",
+        "note": "המבורגר",
+        "createdAt": 1787499089000
+      },
+      {
+        "id": "demo-tx-0268",
+        "type": "expense",
+        "amount": 178.5,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-08-23",
+        "note": "רמי לוי",
+        "createdAt": 1787501546000
+      },
+      {
+        "id": "demo-tx-0272",
+        "type": "expense",
+        "amount": 306.15,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-08-24",
+        "note": "דלק",
+        "createdAt": 1787569150000
+      },
+      {
+        "id": "demo-tx-0273",
+        "type": "expense",
+        "amount": 441.6,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-08-25",
+        "note": "רמי לוי",
+        "createdAt": 1787657775000
+      },
+      {
+        "id": "demo-tx-0275",
+        "type": "expense",
+        "amount": 70,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-27",
+        "note": "מסעדה",
+        "createdAt": 1787810258000
+      },
+      {
+        "id": "demo-tx-0274",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-27",
+        "note": "קפה",
+        "createdAt": 1787821720000
+      },
+      {
+        "id": "demo-tx-0368",
+        "type": "income",
+        "amount": 950,
+        "categoryId": "demo-cat-extra",
+        "catName": "הכנסה נוספת",
+        "date": "2026-08-27",
+        "note": "עבודה פרילנס",
+        "createdAt": 1787846478000
+      },
+      {
+        "id": "demo-tx-0278",
+        "type": "expense",
+        "amount": 233,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-08-28",
+        "note": "נעליים",
+        "createdAt": 1787940540000
+      },
+      {
+        "id": "demo-tx-0276",
+        "type": "expense",
+        "amount": 332.2,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-08-28",
+        "note": "יוחננוף",
+        "createdAt": 1787940682000
+      },
+      {
+        "id": "demo-tx-0277",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-28",
+        "note": "קפה",
+        "createdAt": 1787943846000
+      },
+      {
+        "id": "demo-tx-0280",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-30",
+        "note": "קפה",
+        "createdAt": 1788081733000
+      },
+      {
+        "id": "demo-tx-0279",
+        "type": "expense",
+        "amount": 275.8,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-08-30",
+        "note": "יוחננוף",
+        "createdAt": 1788104946000
+      },
+      {
+        "id": "demo-tx-0281",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-08-31",
+        "note": "קפה",
+        "createdAt": 1788174944000
+      },
+      {
+        "id": "demo-tx-0282",
+        "type": "expense",
+        "amount": 8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-08-31",
+        "note": "רב-קו",
+        "createdAt": 1788198476000
+      },
+      {
+        "id": "demo-tx-0283",
+        "type": "expense",
+        "amount": 4800,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-09-01",
+        "note": "שכירות",
+        "createdAt": 1788245083000
+      },
+      {
+        "id": "demo-tx-0284",
+        "type": "expense",
+        "amount": 494.2,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-09-01",
+        "note": "יוחננוף",
+        "createdAt": 1788250487000
+      },
+      {
+        "id": "demo-tx-0286",
+        "type": "expense",
+        "amount": 346.8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-09-01",
+        "note": "דלק",
+        "createdAt": 1788254163000
+      },
+      {
+        "id": "demo-tx-0285",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-01",
+        "note": "קפה",
+        "createdAt": 1788268944000
+      },
+      {
+        "id": "demo-tx-0287",
+        "type": "expense",
+        "amount": 99,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-09-02",
+        "note": "אינטרנט",
+        "createdAt": 1788322005000
+      },
+      {
+        "id": "demo-tx-0289",
+        "type": "expense",
+        "amount": 177,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-03",
+        "note": "המבורגר",
+        "createdAt": 1788421505000
+      },
+      {
+        "id": "demo-tx-0288",
+        "type": "expense",
+        "amount": 181,
+        "categoryId": "demo-cat-pet",
+        "catName": "חיות מחמד",
+        "date": "2026-09-03",
+        "note": "אוכל לכלב",
+        "createdAt": 1788448692000
+      },
+      {
+        "id": "demo-tx-0291",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-04",
+        "note": "קפה",
+        "createdAt": 1788504542000
+      },
+      {
+        "id": "demo-tx-0374",
+        "type": "expense",
+        "amount": 42,
+        "categoryId": null,
+        "catName": "",
+        "date": "2026-09-04",
+        "note": "חנייה",
+        "createdAt": 1788519629000
+      },
+      {
+        "id": "demo-tx-0292",
+        "type": "expense",
+        "amount": 161,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-04",
+        "note": "פיצה",
+        "createdAt": 1788526655000
+      },
+      {
+        "id": "demo-tx-0290",
+        "type": "expense",
+        "amount": 502.7,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-09-04",
+        "note": "",
+        "createdAt": 1788545579000
+      },
+      {
+        "id": "demo-tx-0293",
+        "type": "expense",
+        "amount": 321.3,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-09-04",
+        "note": "דלק",
+        "createdAt": 1788546030000
+      },
+      {
+        "id": "demo-tx-0294",
+        "type": "expense",
+        "amount": 21.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-09-05",
+        "note": "ספוטיפיי",
+        "createdAt": 1788578251000
+      },
+      {
+        "id": "demo-tx-0295",
+        "type": "expense",
+        "amount": 54.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-09-05",
+        "note": "נטפליקס",
+        "createdAt": 1788578438000
+      },
+      {
+        "id": "demo-tx-0296",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-05",
+        "note": "קפה",
+        "createdAt": 1788620942000
+      },
+      {
+        "id": "demo-tx-0297",
+        "type": "expense",
+        "amount": 8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-09-07",
+        "note": "רב-קו",
+        "createdAt": 1788764310000
+      },
+      {
+        "id": "demo-tx-0298",
+        "type": "expense",
+        "amount": 11.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-09-08",
+        "note": "iCloud",
+        "createdAt": 1788839480000
+      },
+      {
+        "id": "demo-tx-0300",
+        "type": "expense",
+        "amount": 5.5,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-09-08",
+        "note": "רב-קו",
+        "createdAt": 1788862322000
+      },
+      {
+        "id": "demo-tx-0299",
+        "type": "expense",
+        "amount": 176.9,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-09-08",
+        "note": "שופרסל",
+        "createdAt": 1788877260000
+      },
+      {
+        "id": "demo-tx-0303",
+        "type": "expense",
+        "amount": 8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-09-10",
+        "note": "רב-קו",
+        "createdAt": 1789018706000
+      },
+      {
+        "id": "demo-tx-0301",
+        "type": "income",
+        "amount": 14500,
+        "categoryId": "demo-cat-salary",
+        "catName": "משכורת",
+        "date": "2026-09-10",
+        "note": "משכורת ספטמבר",
+        "createdAt": 1789019159000
+      },
+      {
+        "id": "demo-tx-0302",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-10",
+        "note": "קפה",
+        "createdAt": 1789056210000
+      },
+      {
+        "id": "demo-tx-0305",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-11",
+        "note": "קפה",
+        "createdAt": 1789115759000
+      },
+      {
+        "id": "demo-tx-0306",
+        "type": "expense",
+        "amount": 131,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-11",
+        "note": "המבורגר",
+        "createdAt": 1789132057000
+      },
+      {
+        "id": "demo-tx-0304",
+        "type": "expense",
+        "amount": 412.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-09-11",
+        "note": "",
+        "createdAt": 1789154694000
+      },
+      {
+        "id": "demo-tx-0307",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-12",
+        "note": "קפה",
+        "createdAt": 1789210512000
+      },
+      {
+        "id": "demo-tx-0308",
+        "type": "expense",
+        "amount": 424.1,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-09-13",
+        "note": "מכולת",
+        "createdAt": 1789318056000
+      },
+      {
+        "id": "demo-tx-0309",
+        "type": "expense",
+        "amount": 287.48,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-09-14",
+        "note": "דלק",
+        "createdAt": 1789409462000
+      },
+      {
+        "id": "demo-tx-0310",
+        "type": "expense",
+        "amount": 199,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-09-15",
+        "note": "חדר כושר",
+        "createdAt": 1789443675000
+      },
+      {
+        "id": "demo-tx-0311",
+        "type": "expense",
+        "amount": 325.7,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-09-15",
+        "note": "",
+        "createdAt": 1789449751000
+      },
+      {
+        "id": "demo-tx-0312",
+        "type": "expense",
+        "amount": 8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-09-15",
+        "note": "רב-קו",
+        "createdAt": 1789500650000
+      },
+      {
+        "id": "demo-tx-0369",
+        "type": "expense",
+        "amount": 1200,
+        "categoryId": "demo-cat-gift",
+        "catName": "מתנות",
+        "date": "2026-09-16",
+        "note": "מתנה לחתונה",
+        "createdAt": 1789559742000
+      },
+      {
+        "id": "demo-tx-0313",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-17",
+        "note": "קפה",
+        "createdAt": 1789667451000
+      },
+      {
+        "id": "demo-tx-0315",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-18",
+        "note": "קפה",
+        "createdAt": 1789719991000
+      },
+      {
+        "id": "demo-tx-0316",
+        "type": "expense",
+        "amount": 294,
+        "categoryId": "demo-cat-fun",
+        "catName": "פנאי",
+        "date": "2026-09-18",
+        "note": "באולינג",
+        "createdAt": 1789729539000
+      },
+      {
+        "id": "demo-tx-0314",
+        "type": "expense",
+        "amount": 399.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-09-18",
+        "note": "",
+        "createdAt": 1789753371000
+      },
+      {
+        "id": "demo-tx-0317",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-19",
+        "note": "קפה",
+        "createdAt": 1789843753000
+      },
+      {
+        "id": "demo-tx-0319",
+        "type": "expense",
+        "amount": 391.8,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-09-20",
+        "note": "",
+        "createdAt": 1789885244000
+      },
+      {
+        "id": "demo-tx-0320",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-20",
+        "note": "קפה",
+        "createdAt": 1789892157000
+      },
+      {
+        "id": "demo-tx-0321",
+        "type": "expense",
+        "amount": 5.5,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-09-20",
+        "note": "רב-קו",
+        "createdAt": 1789897356000
+      },
+      {
+        "id": "demo-tx-0318",
+        "type": "expense",
+        "amount": 200,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-09-20",
+        "note": "מים",
+        "createdAt": 1789898945000
+      },
+      {
+        "id": "demo-tx-0322",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-21",
+        "note": "קפה",
+        "createdAt": 1789999742000
+      },
+      {
+        "id": "demo-tx-0325",
+        "type": "expense",
+        "amount": 5.5,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-09-22",
+        "note": "רב-קו",
+        "createdAt": 1790073887000
+      },
+      {
+        "id": "demo-tx-0324",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-22",
+        "note": "קפה",
+        "createdAt": 1790091931000
+      },
+      {
+        "id": "demo-tx-0323",
+        "type": "expense",
+        "amount": 186.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-09-22",
+        "note": "מכולת",
+        "createdAt": 1790095709000
+      },
+      {
+        "id": "demo-tx-0326",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-23",
+        "note": "קפה",
+        "createdAt": 1790178522000
+      },
+      {
+        "id": "demo-tx-0327",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-24",
+        "note": "קפה",
+        "createdAt": 1790239918000
+      },
+      {
+        "id": "demo-tx-0328",
+        "type": "expense",
+        "amount": 318.85,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-09-24",
+        "note": "דלק",
+        "createdAt": 1790248602000
+      },
+      {
+        "id": "demo-tx-0329",
+        "type": "expense",
+        "amount": 323.6,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-09-25",
+        "note": "רמי לוי",
+        "createdAt": 1790336208000
+      },
+      {
+        "id": "demo-tx-0330",
+        "type": "expense",
+        "amount": 59,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-25",
+        "note": "שווארמה",
+        "createdAt": 1790341596000
+      },
+      {
+        "id": "demo-tx-0331",
+        "type": "expense",
+        "amount": 85,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-26",
+        "note": "שווארמה",
+        "createdAt": 1790449340000
+      },
+      {
+        "id": "demo-tx-0333",
+        "type": "expense",
+        "amount": 159,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-27",
+        "note": "סושי",
+        "createdAt": 1790494956000
+      },
+      {
+        "id": "demo-tx-0334",
+        "type": "expense",
+        "amount": 542,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-09-27",
+        "note": "אמזון",
+        "createdAt": 1790500656000
+      },
+      {
+        "id": "demo-tx-0332",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-27",
+        "note": "קפה",
+        "createdAt": 1790526466000
+      },
+      {
+        "id": "demo-tx-0336",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-29",
+        "note": "קפה",
+        "createdAt": 1790666086000
+      },
+      {
+        "id": "demo-tx-0337",
+        "type": "expense",
+        "amount": 8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-09-29",
+        "note": "רב-קו",
+        "createdAt": 1790695972000
+      },
+      {
+        "id": "demo-tx-0335",
+        "type": "expense",
+        "amount": 306.9,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-09-29",
+        "note": "רמי לוי",
+        "createdAt": 1790698775000
+      },
+      {
+        "id": "demo-tx-0370",
+        "type": "expense",
+        "amount": 37.9,
+        "categoryId": "demo-cat-health",
+        "catName": "בריאות",
+        "date": "2026-09-30",
+        "note": "",
+        "createdAt": 1790769600000
+      },
+      {
+        "id": "demo-tx-0338",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-09-30",
+        "note": "קפה",
+        "createdAt": 1790781363000
+      },
+      {
+        "id": "demo-tx-0339",
+        "type": "expense",
+        "amount": 4800,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-10-01",
+        "note": "שכירות",
+        "createdAt": 1790836117000
+      },
+      {
+        "id": "demo-tx-0340",
+        "type": "expense",
+        "amount": 8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-10-01",
+        "note": "רב-קו",
+        "createdAt": 1790863597000
+      },
+      {
+        "id": "demo-tx-0341",
+        "type": "expense",
+        "amount": 99,
+        "categoryId": "demo-cat-home",
+        "catName": "דיור וחשבונות",
+        "date": "2026-10-02",
+        "note": "אינטרנט",
+        "createdAt": 1790916377000
+      },
+      {
+        "id": "demo-tx-0342",
+        "type": "expense",
+        "amount": 355.4,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-10-02",
+        "note": "שופרסל",
+        "createdAt": 1790938024000
+      },
+      {
+        "id": "demo-tx-0343",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-10-02",
+        "note": "קפה",
+        "createdAt": 1790939065000
+      },
+      {
+        "id": "demo-tx-0345",
+        "type": "expense",
+        "amount": 18,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-10-03",
+        "note": "קפה",
+        "createdAt": 1791038700000
+      },
+      {
+        "id": "demo-tx-0344",
+        "type": "expense",
+        "amount": 162,
+        "categoryId": "demo-cat-pet",
+        "catName": "חיות מחמד",
+        "date": "2026-10-03",
+        "note": "אוכל לכלב",
+        "createdAt": 1791039797000
+      },
+      {
+        "id": "demo-tx-0346",
+        "type": "expense",
+        "amount": 16,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-10-04",
+        "note": "קפה",
+        "createdAt": 1791106066000
+      },
+      {
+        "id": "demo-tx-0347",
+        "type": "expense",
+        "amount": 276.98,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-10-04",
+        "note": "דלק",
+        "createdAt": 1791129118000
+      },
+      {
+        "id": "demo-tx-0348",
+        "type": "expense",
+        "amount": 21.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-10-05",
+        "note": "ספוטיפיי",
+        "createdAt": 1791170315000
+      },
+      {
+        "id": "demo-tx-0349",
+        "type": "expense",
+        "amount": 54.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-10-05",
+        "note": "נטפליקס",
+        "createdAt": 1791170612000
+      },
+      {
+        "id": "demo-tx-0350",
+        "type": "expense",
+        "amount": 268.2,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-10-06",
+        "note": "מכולת",
+        "createdAt": 1791284441000
+      },
+      {
+        "id": "demo-tx-0351",
+        "type": "expense",
+        "amount": 533,
+        "categoryId": "demo-cat-shop",
+        "catName": "קניות",
+        "date": "2026-10-07",
+        "note": "בגדים",
+        "createdAt": 1791370883000
+      },
+      {
+        "id": "demo-tx-0352",
+        "type": "expense",
+        "amount": 11.9,
+        "categoryId": "demo-cat-subs",
+        "catName": "מנויים",
+        "date": "2026-10-08",
+        "note": "iCloud",
+        "createdAt": 1791431640000
+      },
+      {
+        "id": "demo-tx-0353",
+        "type": "expense",
+        "amount": 8,
+        "categoryId": "demo-cat-car",
+        "catName": "תחבורה ודלק",
+        "date": "2026-10-08",
+        "note": "רב-קו",
+        "createdAt": 1791435646000
+      },
+      {
+        "id": "demo-tx-0354",
+        "type": "expense",
+        "amount": 667.1,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-10-09",
+        "note": "מכולת",
+        "createdAt": 1791550680000
+      },
+      {
+        "id": "demo-tx-0355",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-10-09",
+        "note": "קפה",
+        "createdAt": 1791553230000
+      },
+      {
+        "id": "demo-tx-0356",
+        "type": "expense",
+        "amount": 86,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-10-09",
+        "note": "מסעדה",
+        "createdAt": 1791560015000
+      },
+      {
+        "id": "demo-tx-0357",
+        "type": "income",
+        "amount": 14500,
+        "categoryId": "demo-cat-salary",
+        "catName": "משכורת",
+        "date": "2026-10-10",
+        "note": "משכורת אוקטובר",
+        "createdAt": 1791611424000
+      },
+      {
+        "id": "demo-tx-0358",
+        "type": "expense",
+        "amount": 14,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-10-10",
+        "note": "קפה",
+        "createdAt": 1791624372000
+      },
+      {
+        "id": "demo-tx-0360",
+        "type": "expense",
+        "amount": 12,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-10-11",
+        "note": "קפה",
+        "createdAt": 1791712640000
+      },
+      {
+        "id": "demo-tx-0361",
+        "type": "expense",
+        "amount": 68,
+        "categoryId": "demo-cat-eat",
+        "catName": "אוכל בחוץ",
+        "date": "2026-10-11",
+        "note": "המבורגר",
+        "createdAt": 1791724309000
+      },
+      {
+        "id": "demo-tx-0359",
+        "type": "expense",
+        "amount": 364.7,
+        "categoryId": "demo-cat-super",
+        "catName": "סופר",
+        "date": "2026-10-11",
+        "note": "מכולת",
+        "createdAt": 1791736840000
+      }
+    ]
+  },
+  "nw": {
+    "assets": [
+      {
+        "id": "demo-a-checking",
+        "name": "עו\"ש",
+        "category": "cash",
+        "value": 13420,
+        "updatedAt": 1790921700000
+      },
+      {
+        "id": "demo-a-gemel",
+        "name": "גמל להשקעה",
+        "category": "gemel",
+        "value": 46555.88,
+        "updatedAt": 1788201000000
+      },
+      {
+        "id": "demo-a-hishtalmut",
+        "name": "קרן השתלמות",
+        "category": "hishtalmut",
+        "value": 62960.68,
+        "updatedAt": 1788201000000
+      },
+      {
+        "id": "demo-a-pension",
+        "name": "פנסיה",
+        "category": "pension",
+        "value": 110730.39,
+        "updatedAt": 1788201000000
+      },
+      {
+        "id": "demo-a-ibkr",
+        "name": "IBKR",
+        "category": "trading",
+        "value": 26748.25,
+        "updatedAt": 1791574800000
+      },
+      {
+        "id": "demo-a-car",
+        "name": "רכב",
+        "category": "other",
+        "value": 43900,
+        "updatedAt": 1788201000000
+      },
+      {
+        "id": "demo-a-emergency",
+        "name": "קרן חירום",
+        "category": "cash",
+        "value": 21000,
+        "updatedAt": 1788201000000
+      }
+    ],
+    "liabilities": [
+      {
+        "id": "demo-l-carloan",
+        "name": "הלוואת רכב",
+        "category": "loan",
+        "value": 22250,
+        "updatedAt": 1788201000000
+      },
+      {
+        "id": "demo-l-visa",
+        "name": "כרטיס אשראי",
+        "category": "credit",
+        "value": 5180,
+        "updatedAt": 1790921820000
+      }
+    ],
+    "history": [
+      {
+        "t": 1775149380000,
+        "a": 11800,
+        "l": 0,
+        "n": 11800,
+        "note": "הוספה: עו\"ש"
+      },
+      {
+        "t": 1775149560000,
+        "a": 19800,
+        "l": 0,
+        "n": 19800,
+        "note": "הוספה: חיסכון ישן בבנק"
+      },
+      {
+        "t": 1775149740000,
+        "a": 58000,
+        "l": 0,
+        "n": 58000,
+        "note": "הוספה: גמל להשקעה"
+      },
+      {
+        "t": 1775149920000,
+        "a": 109700,
+        "l": 0,
+        "n": 109700,
+        "note": "הוספה: קרן השתלמות"
+      },
+      {
+        "t": 1775150100000,
+        "a": 206100,
+        "l": 0,
+        "n": 206100,
+        "note": "הוספה: פנסיה"
+      },
+      {
+        "t": 1775150280000,
+        "a": 227400,
+        "l": 0,
+        "n": 227400,
+        "note": "הוספה: IBKR"
+      },
+      {
+        "t": 1775150460000,
+        "a": 273400,
+        "l": 0,
+        "n": 273400,
+        "note": "הוספה: רכב"
+      },
+      {
+        "t": 1775150640000,
+        "a": 273400,
+        "l": 28000,
+        "n": 245400,
+        "note": "הוספה: הלוואת רכב"
+      },
+      {
+        "t": 1775150820000,
+        "a": 273400,
+        "l": 32300,
+        "n": 241100,
+        "note": "הוספה: כרטיס אשראי"
+      },
+      {
+        "t": 1777831800000,
+        "a": 288400,
+        "l": 32300,
+        "n": 256100,
+        "note": "הוספה: קרן חירום"
+      },
+      {
+        "t": 1777660200000,
+        "a": 296243.31,
+        "l": 32850,
+        "n": 263393.31,
+        "note": "עדכון מלא"
+      },
+      {
+        "t": 1780338600000,
+        "a": 303687.7,
+        "l": 30130,
+        "n": 273557.7,
+        "note": "עדכון מלא"
+      },
+      {
+        "t": 1781723100000,
+        "a": 304391.65,
+        "l": 30130,
+        "n": 274261.65,
+        "note": "עדכון: IBKR"
+      },
+      {
+        "t": 1783017000000,
+        "a": 314943.69,
+        "l": 28550,
+        "n": 286393.69,
+        "note": "עדכון מלא"
+      },
+      {
+        "t": 1784133600000,
+        "a": 306943.69,
+        "l": 28550,
+        "n": 278393.69,
+        "note": "מחיקה: חיסכון ישן בבנק"
+      },
+      {
+        "t": 1784133900000,
+        "a": 314943.69,
+        "l": 28550,
+        "n": 286393.69,
+        "note": "עדכון: קרן חירום"
+      },
+      {
+        "t": 1785609000000,
+        "a": 312418.04,
+        "l": 28120,
+        "n": 284298.04,
+        "note": "עדכון מלא"
+      },
+      {
+        "t": 1788201000000,
+        "a": 324759.89,
+        "l": 28300,
+        "n": 296459.89,
+        "note": "עדכון מלא"
+      },
+      {
+        "t": 1789408800000,
+        "a": 323952.8,
+        "l": 28300,
+        "n": 295652.8,
+        "note": "עדכון: IBKR"
+      },
+      {
+        "t": 1790921700000,
+        "a": 324662.8,
+        "l": 28300,
+        "n": 296362.8,
+        "note": "עדכון: עו\"ש"
+      },
+      {
+        "t": 1790921820000,
+        "a": 324662.8,
+        "l": 27430,
+        "n": 297232.8,
+        "note": "עדכון: כרטיס אשראי"
+      },
+      {
+        "t": 1791574800000,
+        "a": 325315.2,
+        "l": 27430,
+        "n": 297885.2,
+        "note": "עדכון: IBKR"
+      }
+    ]
+  }
+}
