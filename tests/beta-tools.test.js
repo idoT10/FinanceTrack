@@ -20,7 +20,7 @@ module.exports=async t=>{
   B.click(B.$('[data-a="beta-wipe"]'));await B.confirm();await sleep(200);
   t.ok(keys(sh,P_BETA+'assets/').length===0&&keys(sh,P_BETA+'categories/').length===8,'wipe clears beta and re-seeds default categories');
   // a write that never gets acknowledged
-  let release;B.fake.fs.setDoc=()=>new Promise(r=>{release=r;});
+  let release;const wb=B.fake.fs.writeBatch;B.fake.fs.writeBatch=(...a)=>{const b=wb(...a);b.commit=()=>new Promise(r=>{release=r;});return b;};   // שמירת תנועה = batch (תנועה + יתרות)
   B.tab('home');await B.addExpense(32);await sleep(5300);
   t.ok(B.$('#sync').textContent==='ממתין לסנכרון','stuck write → chip "ממתין לסנכרון"');
   B.click(B.$('#sync'));await sleep(30);
