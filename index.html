@@ -253,6 +253,17 @@ textarea.input{min-height:130px;direction:ltr;text-align:left;resize:vertical;fo
 .dlg .row{gap:10px}
 .toast{position:fixed;left:50%;bottom:calc(100px + var(--safe-b));transform:translate(-50%,16px);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:999px;font-size:14.5px;font-weight:620;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:90;white-space:nowrap}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.undo{display:flex;align-items:center;gap:4px;padding-block:4px;padding-inline:18px 6px}
+.toast.undo.show{pointer-events:auto}
+.toast-undo{color:inherit;font:inherit;font-weight:760;background:none;border:0;padding:10px 14px;margin:-4px 0;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.save-rate{font-size:15px;color:var(--ink);margin-top:10px}
+.save-rate b{font-weight:760}
+.tx-save-rate{font-size:13.5px;color:var(--ink-2);margin:-8px 2px 14px}
+.tx-save-rate b{color:var(--ink);font-weight:700}
+.search{position:relative;margin:0 0 12px}
+.search .input{padding-inline-end:44px;-webkit-appearance:none;appearance:none}
+.search .input::-webkit-search-cancel-button{display:none}
+.search-x{position:absolute;inset-inline-end:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:none;color:var(--ink-2);font-size:17px;cursor:pointer}
 .toast.err{background:var(--expense);color:#fff}
 body.lock .toast{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 14px)}
 .skel{border-radius:18px;background:var(--sunk);margin-bottom:12px;animation:pulse 1.1s ease-in-out infinite alternate}
@@ -433,7 +444,7 @@ const defaultCats=()=>DEFAULT_CATS.map(([name,icon,type,color],i)=>({id:uid(),na
 const S={
   tx:{categories:[],transactions:[]},
   nw:{assets:[],liabilities:[],history:[]},
-  view:'home',month:monthKey(new Date()),txType:'all',txCat:null,range:'all',
+  view:'home',month:monthKey(new Date()),txType:'all',txCat:null,txQ:'',range:'all',
   catTab:'expense',histOpen:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
 };
 
@@ -479,7 +490,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.2',APP_BUILD='b1',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.3',APP_BUILD='b2',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history'];
 
@@ -567,7 +578,7 @@ const D={
   fail(e){
     console.error(e);
     if(e&&e.code==='permission-denied'){showNoAccess();return;}
-    toast('השמירה נכשלה – נסה שוב','err');
+    toast('השמירה נכשלה – נסה שוב'+errTag(e),'err');
   },
   w(p){syncBegin();p.catch(e=>this.fail(e)).finally(syncEnd);},
   listen(name,apply){
@@ -660,9 +671,23 @@ const D={
     this.w(b.commit());
   },
   delHist(t){this.w(this.F.deleteDoc(this.ref('history',String(t))));},
+  putHist(p){this.w(this.F.setDoc(this.ref('history',String(p.t)),p));},
+  /* ביטול פעולה על נכס/התחייבות: prev=הגרסה הקודמת (או null אם הפריט נוסף עכשיו ולכן נמחק),
+     ptT=הנקודה שנוספה לגרף בפעולה ועכשיו נמחקת */
+  revertItem(kind,id,prev,ptT){
+    const b=this.F.writeBatch(this.db);
+    if(prev){const {id:_,...r}=prev;b.set(this.ref(this.itemCol(kind),id),r);}else b.delete(this.ref(this.itemCol(kind),id));
+    if(ptT)b.delete(this.ref('history',String(ptT)));
+    this.w(b.commit());
+  },
   bulk(ups,pt){
     const ops=ups.map(u=>({ref:this.ref(this.itemCol(u.kind),u.id),update:true,data:{value:u.value,updatedAt:u.updatedAt}}));
     if(pt)ops.push({ref:this.ref('history',String(pt.t)),data:pt});
+    this.w(this.runOps(ops));
+  },
+  bulkRevert(ups,ptT){
+    const ops=ups.map(u=>({ref:this.ref(this.itemCol(u.kind),u.id),update:true,data:{value:u.value,updatedAt:u.updatedAt}}));
+    if(ptT)ops.push({ref:this.ref('history',String(ptT)),del:true});
     this.w(this.runOps(ops));
   },
   /* כל כתיבה בודקת את allowlist בכללי האבטחה (קריאת exists אחת), ו-Firestore מגביל batch ל-20 קריאות כאלה.
@@ -705,7 +730,7 @@ const D={
     old.liabs.forEach(id=>ops.push({ref:this.ref('liabilities',id),del:true}));
     old.hist.forEach(id=>ops.push({ref:this.ref('history',id),del:true}));
     cats.forEach(c=>{const {id,...r}=c;ops.push({ref:this.ref('categories',id),data:r});});
-    try{await this.runOps(ops);}catch(e){console.error(e);toast('המחיקה לא הושלמה. נסו שוב','err');}
+    try{await this.runOps(ops);}catch(e){console.error(e);toast('המחיקה לא הושלמה. נסו שוב'+errTag(e),'err');}
   },
   /* ---- כלים לסביבת הבדיקה בלבד. קוראים מהייצור, אף פעם לא כותבים אליו ---- */
   async readAll(env){
@@ -868,11 +893,25 @@ function rangePoints(){
 function usageCounts(){const m={};for(const t of S.tx.transactions)m[t.categoryId]=(m[t.categoryId]||0)+1;return m;}
 
 /* ================= UI bits ================= */
-let toastTimer;
-function toast(msg,kind){
-  const el=$('#toast');el.textContent=msg;el.className='toast show'+(kind?' '+kind:'');
-  clearTimeout(toastTimer);toastTimer=setTimeout(()=>{el.className='toast';},2300);
+let toastTimer,undoFn=null;
+const UNDO_MS=5000;
+/* undo: פונקציה שמחזירה את המצב הקודם. מוצג כפתור "בטל" ל-5 שניות */
+function toast(msg,kind,undo){
+  const el=$('#toast');
+  undoFn=typeof undo==='function'?undo:null;
+  if(undoFn)el.innerHTML='<span>'+esc(msg)+'</span><button class="toast-undo" data-a="undo">בטל</button>';
+  else el.textContent=msg;
+  el.className='toast show'+(kind?' '+kind:'')+(undoFn?' undo':'');
+  clearTimeout(toastTimer);
+  if(kind==='busy')return;   // הודעת "עובד…" נשארת עד ההודעה הבאה
+  toastTimer=setTimeout(()=>{el.className='toast';undoFn=null;},undoFn?UNDO_MS:2300);
 }
+function runUndo(){
+  const fn=undoFn;undoFn=null;clearTimeout(toastTimer);$('#toast').className='toast';
+  if(fn)fn();
+}
+/* בסביבת הבדיקה מוסיפים להודעות שגיאה את קוד השגיאה (בייצור לא מציגים מונחים טכניים) */
+function errTag(e){return ENV==='beta'&&e?' ('+String(e.code||e.name||e.message||e).slice(0,60)+')':'';}
 function askConfirm(msg,opt){
   opt=opt||{};
   return new Promise(res=>{
@@ -888,6 +927,7 @@ function askConfirm(msg,opt){
   });
 }
 function openSheet(html){
+  {const t=$('#toast');if(t.classList.contains('busy'))t.className='toast';}   // חלון שנפתח בסוף פעולה מחליף את "עובד…"
   const sh=$('#sheet');
   sh.innerHTML='<div class="grab"></div>'+html;
   sh.scrollTop=0;
@@ -1007,16 +1047,32 @@ function bannerHtml(){
   return '';
 }
 
+/* שיעור חיסכון = (הכנסות פחות הוצאות) חלקי הכנסות. rate=null כשאין מה לחשב או כשההוצאות גבוהות מההכנסות */
+function saveRate(inc,exp){
+  if(!(inc>0))return{rate:null,text:'עוד לא נרשמו הכנסות בחודש הזה.'};
+  if(exp>inc)return{rate:null,text:'ההוצאות עולות על ההכנסות החודש.'};
+  const rate=pct(inc-exp,inc);
+  return{rate,text:'חסכת '+rate+'% מההכנסות.',html:'חסכת <b>'+rate+'%</b> מההכנסות'};
+}
+/* חיפוש בחודש שמוצג: מספר = לפי סכום (120 מוצא 120 ו-120.50) או בהערה; טקסט = בהערה ובשם הקטגוריה */
+function matchQ(t,q){
+  q=q.trim().toLowerCase();if(!q)return true;
+  const note=(t.note||'').toLowerCase();
+  const num=q.replace(/[₪,\s]/g,'');
+  if(/^\d+(\.\d+)?$/.test(num)){
+    const n=+num,hit=num.includes('.')?r2(t.amount)===r2(n):Math.floor(t.amount)===n;
+    return hit||note.includes(q);
+  }
+  return note.includes(q)||catView(catKey(t)).name.toLowerCase().includes(q)||(t.catName||'').toLowerCase().includes(q);
+}
 function viewHome(){
   const now=new Date(),mk=monthKey(now);
   const monthTx=S.tx.transactions.filter(t=>t.date.slice(0,7)===mk);
   const {inc,exp,net}=sumTx(monthTx);
   const max=Math.max(inc,exp,1);
   let hint;
-  if(!monthTx.length)hint='עוד אין תנועות החודש. לחיצה על ＋ מוסיפה את הראשונה.';
-  else if(inc===0)hint='עוד לא נרשמו הכנסות החודש.';
-  else if(exp>inc)hint='ההוצאות עולות על ההכנסות ב־'+money(exp-inc)+'.';
-  else hint='הוצאת '+pct(exp,inc)+'% מההכנסות, ונשארו '+money(inc-exp)+'.';
+  if(!monthTx.length)hint='<p class="hint">עוד אין תנועות החודש. לחיצה על ＋ מוסיפה את הראשונה.</p>';
+  else{const sr=saveRate(inc,exp);hint=sr.rate===null?'<p class="hint">'+sr.text+'</p>':'<p class="save-rate">'+sr.html+'</p>';}
 
   let h='<section class="flow" data-a="go" data-v="tx" role="button" aria-label="פתיחת תנועות החודש">'+
     '<h2 class="h">תזרים '+esc(F.monthOnly.format(now))+'</h2>'+
@@ -1024,7 +1080,7 @@ function viewHome(){
     '<div class="ledger">'+
       '<div class="lg-row"><span class="lg-name">הכנסות</span><span class="lg-bar"><i class="inc" style="width:'+(inc/max*100)+'%"></i></span><b>'+money(inc)+'</b></div>'+
       '<div class="lg-row"><span class="lg-name">הוצאות</span><span class="lg-bar"><i class="exp" style="width:'+(exp/max*100)+'%"></i></span><b>'+money(exp)+'</b></div>'+
-    '</div><p class="hint">'+hint+'</p></section>';
+    '</div>'+hint+'</section>';
 
   const t=nwTotals(),pts=rangePoints();
   h+='<section class="panel"><div class="row between"><h2 class="h">שווי נקי</h2><button class="link" data-a="nav" data-v="nw">פירוט נכסים</button></div>'+
@@ -1046,21 +1102,30 @@ function viewHome(){
   return h;
 }
 
-function viewTx(){
-  const mk=S.month,cur=monthKey(new Date());
-  const monthTx=S.tx.transactions.filter(t=>t.date.slice(0,7)===mk);
-  const tot=sumTx(monthTx);
+function txMonthData(){
+  const mk=S.month,monthTx=S.tx.transactions.filter(t=>t.date.slice(0,7)===mk);
   const typed=S.txType==='all'?monthTx:monthTx.filter(t=>t.type===S.txType);
+  const list=(S.txCat?typed.filter(t=>catKey(t)===S.txCat):typed).filter(t=>matchQ(t,S.txQ)).sort(sortTx);
+  return{mk,monthTx,typed,list,tot:sumTx(monthTx)};
+}
+function viewTx(){
+  const {mk,monthTx,typed,tot}=txMonthData(),cur=monthKey(new Date());
   const sums={};
   for(const t of typed){const k=catKey(t);sums[k]=(sums[k]||0)+t.amount;}
   const ids=Object.keys(sums).sort((a,b)=>sums[b]-sums[a]);
   if(S.txCat&&!ids.includes(S.txCat))ids.unshift(S.txCat);
-  const list=(S.txCat?typed.filter(t=>catKey(t)===S.txCat):typed).slice().sort(sortTx);
 
   let h='<div class="month-sw"><button class="icon-btn" data-a="month" data-v="-1" aria-label="חודש קודם">'+ICON.chevR+'</button>'+
     '<div class="mname">'+esc(monthName(mk))+(mk!==cur?'<div><button class="link small" data-a="month" data-v="0">חזרה לחודש הנוכחי</button></div>':'')+'</div>'+
     '<button class="icon-btn" data-a="month" data-v="1" aria-label="חודש הבא">'+ICON.chevL+'</button></div>';
   h+='<div class="tri"><div><span>הכנסות</span><b class="pos">'+money(tot.inc)+'</b></div><div><span>הוצאות</span><b class="neg">'+money(tot.exp)+'</b></div><div><span>תזרים</span><b>'+money(tot.net,{sign:true})+'</b></div></div>';
+  if(monthTx.length&&tot.inc>0){
+    const sr=saveRate(tot.inc,tot.exp);
+    h+='<div class="tx-save-rate">'+(sr.rate===null?'ההוצאות עולות על ההכנסות':'שיעור חיסכון <b>'+sr.rate+'%</b>')+'</div>';
+  }
+  h+='<div class="search"><input class="input" id="tx-search" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" '+
+    'placeholder="חיפוש בהערה, קטגוריה או סכום" aria-label="חיפוש תנועות בחודש" value="'+esc(S.txQ)+'">'+
+    '<button class="search-x" data-a="tx-q-clear" aria-label="ניקוי החיפוש"'+(S.txQ?'':' hidden')+'>✕</button></div>';
   h+='<div class="seg">'+[['all','הכל',''],['expense','הוצאות','exp'],['income','הכנסות','inc']].map(([v,l,c])=>
     '<button data-a="tx-type" data-v="'+v+'" class="'+(S.txType===v?'on '+c:'')+'">'+l+'</button>').join('')+'</div>';
 
@@ -1068,13 +1133,19 @@ function viewTx(){
     h+='<div class="chips scroll"><button class="chip '+(!S.txCat?'on':'')+'" data-a="tx-cat" data-id="">כל הקטגוריות</button>'+
       ids.map(id=>{const c=catView(id);return '<button class="chip '+(S.txCat===id?'on':'')+'" style="--c:'+c.color+'" data-a="tx-cat" data-id="'+esc(id)+'">'+esc(c.icon)+' '+esc(c.name)+'</button>';}).join('')+'</div>';
   }
-  if(S.txCat||S.txType!=='all'){
+  return h+'<div id="tx-results">'+txResults()+'</div>';
+}
+/* החלק שמתעדכן בזמן הקלדה בחיפוש (בלי לצייר מחדש את שדה החיפוש, כדי שהמקלדת לא תיסגר) */
+function txResults(){
+  const {mk,monthTx,list,tot}=txMonthData(),q=S.txQ.trim();
+  let h='';
+  if((S.txCat||S.txType!=='all'||q)&&list.length){
     const s=r2(list.reduce((x,t)=>x+t.amount,0));
-    h+='<div class="filter-sum">'+(list.length===1?'תנועה אחת':list.length+' תנועות')+' בסינון, בסך '+money(s,{dec:true})+'</div>';
+    h+='<div class="filter-sum">'+(list.length===1?'תנועה אחת':list.length+' תנועות')+(q?' מתאימות לחיפוש':' בסינון')+', בסך '+money(s,{dec:true})+'</div>';
   }
 
   const btype=S.txType==='income'?'income':'expense';
-  if(!S.txCat){
+  if(!S.txCat&&!q){
     const bs={};
     for(const t of monthTx)if(t.type===btype){const k=catKey(t);bs[k]=(bs[k]||0)+t.amount;}
     const bids=Object.keys(bs).sort((a,b)=>bs[b]-bs[a]);
@@ -1091,7 +1162,7 @@ function viewTx(){
   }else if(!monthTx.length){
     h+='<div class="surface empty" style="margin-top:16px">אין תנועות ב'+esc(monthName(mk))+'.<br><button class="btn primary" data-a="fab">הוספת תנועה</button></div>';
   }else if(!list.length){
-    h+='<div class="surface empty" style="margin-top:16px">אין תנועות שמתאימות לסינון.<br><button class="btn ghost" data-a="tx-clear">ניקוי סינון</button></div>';
+    h+='<div class="surface empty" style="margin-top:16px">'+(q?'לא נמצאו תנועות ב'+esc(monthName(mk))+'.':'אין תנועות שמתאימות לסינון.')+'<br><button class="btn ghost" data-a="tx-clear">ניקוי '+(q?'החיפוש והסינון':'סינון')+'</button></div>';
   }else{
     const groups=[];
     for(const t of list){
@@ -1103,6 +1174,11 @@ function viewTx(){
       '<div class="surface list">'+g.items.map(t=>txRow(t,false)).join('')+'</div>').join('');
   }
   return h;
+}
+function updateTxResults(){
+  const r=$('#tx-results');if(!r)return;
+  r.innerHTML=txResults();
+  const x=$('#view .search-x');if(x)x.hidden=!S.txQ;
 }
 
 function viewNw(){
@@ -1185,7 +1261,10 @@ function render(){
   if(!S.ready)return;
   syncMonths();
   const views={home:viewHome,tx:viewTx,nw:viewNw,settings:viewSettings};
+  // עדכון מהסנכרון בזמן הקלדה בחיפוש: מחזירים את הפוקוס והסמן, כדי שהמקלדת לא תיסגר
+  const ae=document.activeElement,keepQ=ae&&ae.id==='tx-search'?[ae.selectionStart,ae.selectionEnd]:null;
   $('#view').innerHTML=bannerHtml()+views[S.view]();
+  if(keepQ){const i=$('#tx-search');if(i){try{i.focus({preventScroll:true});i.setSelectionRange(keepQ[0],keepQ[1]);}catch(err){}}}
   $('#top-title').textContent=TITLES[S.view];
   $('#top-sub').textContent=S.view==='home'?F.dayLong.format(new Date()):'\u00a0';
   $$('.tab').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
@@ -1249,18 +1328,29 @@ function saveTx(){
   const note=$('#f-note').value.trim();
   const catName=catView(f.categoryId).name;
   const mk=date.slice(0,7),active=wantedMonths().has(mk);
-  let t;
+  let t,prev=null;
   if(f.id){
     t=S.tx.transactions.find(x=>x.id===f.id);
     if(!t)return;
+    prev=Object.assign({},t);
     Object.assign(t,{type:f.type,amount,categoryId:f.categoryId,catName,date,note});
   }else{
     t={id:uid(),type:f.type,amount,categoryId:f.categoryId,catName,date,note,createdAt:Date.now()};
     if(active)S.tx.transactions.push(t);
   }
-  const edited=!!f.id;
+  const edited=!!f.id,tid=t.id;
   D.putTx(t);closeSheet();render();
-  toast(!active?'נשמר ב'+monthName(mk):edited?'השינויים נשמרו':(f.type==='income'?'ההכנסה נשמרה':'ההוצאה נשמרה'));
+  const undo=edited
+    ?()=>{   // מחזירים את הגרסה הקודמת של התנועה
+      const cur=S.tx.transactions.find(x=>x.id===tid);
+      if(cur)Object.assign(cur,prev);else if(wantedMonths().has(prev.date.slice(0,7)))S.tx.transactions.push(Object.assign({},prev));
+      D.putTx(Object.assign({},prev));render();toast('השינויים בוטלו');
+    }
+    :()=>{   // ההוספה בוטלה: מוחקים את התנועה החדשה
+      S.tx.transactions=S.tx.transactions.filter(x=>x.id!==tid);
+      D.delTx(tid);render();toast('ההוספה בוטלה');
+    };
+  toast(!active?'נשמר ב'+monthName(mk):edited?'השינויים נשמרו':(f.type==='income'?'ההכנסה נשמרה':'ההוצאה נשמרה'),'',undo);
 }
 
 /* ================= sheets: assets & liabilities ================= */
@@ -1288,9 +1378,10 @@ function saveNw(){
   if(!raw.trim()||!(value>=0)){toast('צריך סכום תקין');focusEl($('#n-value'));return;}
   const name=$('#n-name').value.trim()||cats.find(c=>c.id===f.category).name;
   const now=Date.now();
-  let item;
+  let item,prev=null;
   if(f.id){
     item=list.find(i=>i.id===f.id);if(!item)return;
+    prev=Object.assign({},item);
     Object.assign(item,{name,category:f.category,value,updatedAt:now});
   }else{
     item={id:uid(),name,category:f.category,value,updatedAt:now};
@@ -1299,7 +1390,14 @@ function saveNw(){
   const pt=snapshot((f.id?'עדכון: ':'הוספה: ')+name);
   const edited=!!f.id,nk=f.nk;
   D.putItem(nk,item,pt);closeSheet();render();
-  toast(edited?(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר'):(nk==='asset'?'הנכס נוסף':'ההתחייבות נוספה'));
+  const iid=item.id;
+  toast(edited?(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר'):(nk==='asset'?'הנכס נוסף':'ההתחייבות נוספה'),'',()=>{
+    const lst=nk==='asset'?S.nw.assets:S.nw.liabilities,cur=lst.find(i=>i.id===iid);
+    if(prev){if(cur)Object.assign(cur,prev);else lst.push(Object.assign({},prev));}
+    else{const i=lst.indexOf(cur);if(i>=0)lst.splice(i,1);}
+    if(pt)S.nw.history=S.nw.history.filter(p=>p.t!==pt.t);
+    D.revertItem(nk,iid,prev,pt&&pt.t);render();toast(prev?'העדכון בוטל':'ההוספה בוטלה');
+  });
 }
 
 /* ================= sheets: categories ================= */
@@ -1373,10 +1471,15 @@ function saveBulk(){
     changes.push({kind,x,v});
   }
   if(!changes.length){closeSheet();return;}
+  const olds=changes.map(({kind,x})=>({kind,id:x.id,value:x.value,updatedAt:x.updatedAt}));
   const ups=changes.map(({kind,x,v})=>{x.value=v;x.updatedAt=now;return{kind,id:x.id,value:v,updatedAt:now};});
   const pt=snapshot('עדכון מלא');
   D.bulk(ups,pt);closeSheet();render();
-  toast(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר');
+  toast(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר','',()=>{
+    for(const o of olds){const x=(o.kind==='asset'?S.nw.assets:S.nw.liabilities).find(i=>i.id===o.id);if(x){x.value=o.value;x.updatedAt=o.updatedAt;}}
+    if(pt)S.nw.history=S.nw.history.filter(p=>p.t!==pt.t);
+    D.bulkRevert(olds,pt&&pt.t);render();toast('העדכון המלא בוטל');
+  });
 }
 
 /* ================= sheet: קטגוריה (עם ספירת שימוש מהשרת) ================= */
@@ -1441,11 +1544,12 @@ async function openStatsSheet(){
 /* ייצוא בשני שלבים: קודם מכינים את הקובץ (קריאה מהשרת), ואז המשתמש לוחץ "שמירת הקובץ".
    באייפון חלון השיתוף נפתח רק ישירות מלחיצה, ולא אחרי המתנה לשרת. */
 async function doExport(){
-  toast('מכין גיבוי…');
+  if(navigator.onLine===false){toast('הגיבוי דורש חיבור לאינטרנט','err');return;}
+  toast('מכין גיבוי…','busy');
   let all;
   try{
     all=await Promise.race([D.allTx(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000))]);
-  }catch(e){console.error(e);toast('אין חיבור לאינטרנט. נסו שוב','err');return;}
+  }catch(e){console.error(e);toast('אין חיבור לאינטרנט. נסו שוב'+errTag(e),'err');return;}
   const data={app:'personal-finance-dashboard',version:2,exportedAt:new Date().toISOString(),tx:{categories:S.tx.categories,transactions:all},nw:S.nw};
   const name='finance-backup-'+todayStr()+'.json';
   const file=new File([JSON.stringify(data,null,2)],name,{type:'application/json'});
@@ -1463,7 +1567,8 @@ function saveExport(){
   try{canShare=!!(navigator.canShare&&navigator.share&&navigator.canShare({files:[file]}));}catch(e){}
   if(canShare){
     // נקרא ישירות מהלחיצה, בלי await לפניו
-    navigator.share({files:[file],title:file.name})
+    // רק הקובץ: עם title/text האייפון שומר גם קובץ טקסט נוסף עם השם
+    navigator.share({files:[file]})
       .then(()=>{closeSheet();toast('הגיבוי נשמר');})
       .catch(e=>{
         if(e&&e.name==='AbortError')return;
@@ -1547,23 +1652,23 @@ function importSummary(plan){
   return rows.join('');
 }
 async function runImport(plan){
-  toast('מייבא…');
+  toast('מייבא…','busy');
   try{
     const a=plan.add;
     await D.importAll({categories:a.categories,transactions:a.transactions},{assets:a.assets,liabilities:a.liabilities,history:a.history});
     toast('נוספו '+F.n0.format(plan.total)+' פריטים מהגיבוי');
-  }catch(e){console.error(e);toast('הייבוא לא הושלם. אפשר לייבא שוב, מה שכבר נוסף ידולג','err');}
+  }catch(e){console.error(e);toast('הייבוא לא הושלם. אפשר לייבא שוב, מה שכבר נוסף ידולג'+errTag(e),'err');}
 }
 async function importFile(file){
   let obj;
   try{obj=JSON.parse(await file.text());}catch(e){toast('הקובץ אינו גיבוי תקין','err');return;}
   if(!obj||typeof obj!=='object'||!obj.tx||!obj.nw){toast('הקובץ אינו גיבוי של הדשבורד','err');return;}
   const bTx=normTx(obj.tx),bNw=normNw(obj.nw);
-  toast('בודק מה כבר קיים…');
+  toast('בודק מה כבר קיים…','busy');
   let curTx;
   try{
     curTx=await Promise.race([D.allTx(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000))]);
-  }catch(e){console.error(e);toast('הייבוא דורש חיבור לאינטרנט','err');return;}
+  }catch(e){console.error(e);toast('הייבוא דורש חיבור לאינטרנט'+errTag(e),'err');return;}
   const cur={cats:S.tx.categories,tx:curTx,assets:S.nw.assets,liabs:S.nw.liabilities,hist:S.nw.history};
   const plan=planImport(bTx,bNw,cur);
   if(!plan.total){toast('כל מה שבגיבוי כבר קיים בחשבון');return;}
@@ -1592,7 +1697,8 @@ document.addEventListener('click',async e=>{
     case 'month':S.month=v==='0'?monthKey(new Date()):shiftMonth(S.month,+v);render();break;
     case 'tx-type':S.txType=v;S.txCat=null;render();break;
     case 'tx-cat':S.txCat=(!id||S.txCat===id)?null:id;render();break;
-    case 'tx-clear':S.txCat=null;S.txType='all';render();break;
+    case 'tx-clear':S.txCat=null;S.txType='all';S.txQ='';render();break;
+    case 'tx-q-clear':{S.txQ='';const i=$('#tx-search');if(i){i.value='';i.focus();}updateTxResults();break;}
     case 'tx-edit':openTxSheet(id);break;
     case 'range':S.range=v;render();break;
     case 'sheet-close':closeSheet();break;
@@ -1605,10 +1711,17 @@ document.addEventListener('click',async e=>{
     case 'tx-save':saveTx();break;
     case 'tx-del':{
       if(!f||!f.id)break;
-      if(!await askConfirm('למחוק את התנועה?',{ok:'מחיקה',danger:true}))break;
+      const old=S.tx.transactions.find(t=>t.id===f.id);if(!old)break;
+      const copy=Object.assign({},old);
       S.tx.transactions=S.tx.transactions.filter(t=>t.id!==f.id);
-      D.delTx(f.id);closeSheet();render();toast('התנועה נמחקה');break;
+      D.delTx(f.id);closeSheet();render();
+      toast('התנועה נמחקה','',()=>{
+        if(wantedMonths().has(copy.date.slice(0,7))&&!S.tx.transactions.some(t=>t.id===copy.id))S.tx.transactions.push(copy);
+        D.putTx(copy);render();toast('התנועה הוחזרה');
+      });
+      break;
     }
+    case 'undo':runUndo();break;
 
     case 'asset-add':openNwSheet('asset');break;
     case 'liab-add':openNwSheet('liab');break;
@@ -1621,18 +1734,29 @@ document.addEventListener('click',async e=>{
     case 'nw-del':{
       if(!f||!f.id)break;
       const list=f.nk==='asset'?S.nw.assets:S.nw.liabilities,x=list.find(i=>i.id===f.id);if(!x)break;
-      if(!await askConfirm('למחוק את "'+x.name+'"? השווי הנקי יתעדכן ותתווסף נקודה לגרף.',{ok:'מחיקה',danger:true}))break;
-      const nk=f.nk;
+      const nk=f.nk,copy=Object.assign({},x);
       if(nk==='asset')S.nw.assets=S.nw.assets.filter(i=>i.id!==x.id);else S.nw.liabilities=S.nw.liabilities.filter(i=>i.id!==x.id);
       const pt=snapshot('מחיקה: '+x.name);
-      D.delItem(nk,x.id,pt);closeSheet();render();toast('נמחק');break;
+      D.delItem(nk,x.id,pt);closeSheet();render();
+      toast('"'+x.name+'" נמחק','',()=>{
+        const lst=nk==='asset'?S.nw.assets:S.nw.liabilities;
+        if(!lst.some(i=>i.id===copy.id))lst.push(copy);
+        if(pt)S.nw.history=S.nw.history.filter(p=>p.t!==pt.t);
+        D.revertItem(nk,copy.id,copy,pt&&pt.t);render();toast('"'+copy.name+'" הוחזר');
+      });
+      break;
     }
     case 'hist-toggle':S.histOpen=!S.histOpen;render();break;
     case 'hist-del':{
-      const ts=+id;
-      if(!await askConfirm('למחוק את הנקודה מהגרף? הנכסים עצמם לא ישתנו.',{ok:'מחיקה',danger:true}))break;
+      const ts=+id,old=S.nw.history.find(p=>p.t===ts);if(!old)break;
+      const copy=Object.assign({},old);
       S.nw.history=S.nw.history.filter(p=>p.t!==ts);
-      D.delHist(ts);render();break;
+      D.delHist(ts);render();
+      toast('הנקודה נמחקה מהגרף','',()=>{
+        if(!S.nw.history.some(p=>p.t===copy.t)){S.nw.history.push(copy);S.nw.history.sort((a,b)=>a.t-b.t);}
+        D.putHist(copy);render();toast('הנקודה הוחזרה');
+      });
+      break;
     }
 
     case 'cat-tab':S.catTab=v;render();break;
@@ -1644,13 +1768,16 @@ document.addEventListener('click',async e=>{
     case 'cat-save':saveCat();break;
     case 'cat-del':{
       if(!f||!f.id)break;
-      const msg=f.used?'יש '+f.used+' תנועות בקטגוריה. הן יישארו, בלי קטגוריה. למחוק?'
-        :f.usedKnown?'למחוק את הקטגוריה?'
-        :'אם יש בקטגוריה תנועות, הן יישארו בלי קטגוריה. למחוק?';
-      if(!await askConfirm(msg,{ok:'מחיקה',danger:true}))break;
+      const old=S.tx.categories.find(c=>c.id===f.id);if(!old)break;
+      const copy=Object.assign({},old);
       S.tx.categories=S.tx.categories.filter(c=>c.id!==f.id);
       if(S.txCat===f.id)S.txCat=null;
-      D.delCat(f.id);closeSheet();render();toast('הקטגוריה נמחקה');break;
+      D.delCat(f.id);closeSheet();render();
+      toast(f.used?'הקטגוריה נמחקה ('+f.used+' תנועות נשארו בלי קטגוריה)':'הקטגוריה נמחקה','',()=>{
+        if(!S.tx.categories.some(c=>c.id===copy.id)){S.tx.categories.push(copy);S.tx.categories.sort((a,b)=>a.ord-b.ord);}
+        D.putCat(copy);render();toast('הקטגוריה הוחזרה');
+      });
+      break;
     }
 
     case 'bk':if(v==='export')doExport();else $('#file').click();break;
@@ -1662,17 +1789,17 @@ document.addEventListener('click',async e=>{
     case 'beta-copy':{
       if(ENV!=='beta')break;
       if(!await askConfirm('להחליף את נתוני הבדיקה בעותק של הנתונים האמיתיים? הנתונים האמיתיים לא ישתנו.',{ok:'העתקה'}))break;
-      toast('מעתיק…');
+      toast('מעתיק…','busy');
       try{const n=await D.betaCopyFromProd();toast('הועתקו '+n+' מסמכים לסביבת הבדיקה');}
-      catch(err){console.error(err);toast('ההעתקה נכשלה. בדקו את החיבור ונסו שוב','err');}
+      catch(err){console.error(err);toast('ההעתקה נכשלה. בדקו את החיבור ונסו שוב'+errTag(err),'err');}
       break;
     }
     case 'beta-wipe':{
       if(ENV!=='beta')break;
       if(!await askConfirm('למחוק את כל נתוני הבדיקה? הנתונים האמיתיים לא ישתנו.',{ok:'ניקוי',danger:true}))break;
-      toast('מנקה…');
+      toast('מנקה…','busy');
       try{const n=await D.betaWipe();toast('נוקו '+n+' מסמכים מסביבת הבדיקה');}
-      catch(err){console.error(err);toast('הניקוי נכשל. בדקו את החיבור ונסו שוב','err');}
+      catch(err){console.error(err);toast('הניקוי נכשל. בדקו את החיבור ונסו שוב'+errTag(err),'err');}
       break;
     }
     case 'signout':{
@@ -1682,9 +1809,9 @@ document.addEventListener('click',async e=>{
     }
     case 'reset':{
       if(!await askConfirm('למחוק לצמיתות את כל התנועות, הקטגוריות, הנכסים וההיסטוריה? כדאי לייצא גיבוי קודם.',{ok:'מחיקת הכל',danger:true}))break;
-      toast('מוחק…');
+      toast('מוחק…','busy');
       let txIds;
-      try{txIds=await D.txIds();}catch(err){console.error(err);toast('המחיקה דורשת חיבור לאינטרנט','err');break;}
+      try{txIds=await D.txIds();}catch(err){console.error(err);toast('המחיקה דורשת חיבור לאינטרנט'+errTag(err),'err');break;}
       const old={cats:S.tx.categories.map(c=>c.id),txs:txIds,assets:S.nw.assets.map(x=>x.id),
         liabs:S.nw.liabilities.map(x=>x.id),hist:S.nw.history.map(p=>String(p.t))};
       const cats=defaultCats();
@@ -1698,6 +1825,7 @@ document.addEventListener('input',e=>{
   const el=e.target;
   if(el.id==='f-amount'||el.id==='n-value')sizeAmount(el);
   if(el.classList&&el.classList.contains('bulk-in'))bulkTotal();
+  if(el.id==='tx-search'){S.txQ=el.value;updateTxResults();}
 });
 document.addEventListener('focusin',e=>{
   const el=e.target;
@@ -1709,6 +1837,7 @@ document.addEventListener('change',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){if($('#dialog').classList.contains('open'))return;if($('#sheet').classList.contains('open'))closeSheet();return;}
+  if(e.key==='Enter'&&e.target.id==='tx-search'){e.preventDefault();e.target.blur();return;}
   if(e.key==='Enter'&&e.target.matches('#sheet input:not([type=date])')){
     e.preventDefault();
     if(e.target.id==='f-newcat-name'){addInlineCat();return;}
@@ -1724,7 +1853,7 @@ if(window.visualViewport){window.visualViewport.addEventListener('resize',fitShe
 let rz;
 window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(S.ready){const pts=rangePoints();$$('#view [data-chart]').forEach(el=>drawChart(el,pts));}},150);});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready)render();});
-window.addEventListener('online',()=>{syncUpdate();if(S.ready)render();});
+window.addEventListener('online',()=>{syncUpdate();if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready)render();});
 window.addEventListener('offline',()=>{syncUpdate();if(S.ready)render();});
 
 /* ================= boot ================= */
