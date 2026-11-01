@@ -77,6 +77,21 @@ module.exports=async t=>{
   A.click(undoBtn(A));await sleep(40);
   t.ok(sh.store.get(P_BETA+'assets/a1').value===5000&&keys(sh,P_BETA+'history/').length===1,'undo asset delete: item back, extra graph point removed');
 
+  // ---- undo: asset edit / add / full update ----
+  A.click(A.$('[data-a="asset-edit"][data-id="a1"]'));A.type(A.$('#n-value'),'7000');A.click(A.$('[data-a="nw-save"]'));await sleep(40);
+  t.ok(sh.store.get(P_BETA+'assets/a1').value===7000&&keys(sh,P_BETA+'history/').length===2&&undoBtn(A),'asset edit: saved, graph point added, "בטל" shown');
+  A.click(undoBtn(A));await sleep(40);
+  t.ok(sh.store.get(P_BETA+'assets/a1').value===5000&&keys(sh,P_BETA+'history/').length===1&&/העדכון בוטל/.test(A.toast()),'undo asset edit: old value back, graph point removed');
+  const nA=keys(sh,P_BETA+'assets/').length;
+  A.click(A.$('[data-a="asset-add"]'));A.type(A.$('#n-value'),'300');A.click(A.$('[data-a="nw-save"]'));await sleep(40);
+  t.ok(keys(sh,P_BETA+'assets/').length===nA+1,'asset added');
+  A.click(undoBtn(A));await sleep(40);
+  t.ok(keys(sh,P_BETA+'assets/').length===nA&&keys(sh,P_BETA+'history/').length===1,'undo asset add: asset and its graph point removed');
+  A.click(A.$('[data-a="nw-bulk"]'));A.$$('.bulk-in')[0].value='9000';A.click(A.$('[data-a="bulk-save"]'));await sleep(60);
+  t.ok(sh.store.get(P_BETA+'assets/a1').value===9000&&undoBtn(A),'full update saved with "בטל"');
+  A.click(undoBtn(A));await sleep(60);
+  t.ok(sh.store.get(P_BETA+'assets/a1').value===5000&&keys(sh,P_BETA+'history/').length===1,'undo full update: values back, graph point removed');
+
   // ---- undo: graph point delete ----
   A.click(A.$('[data-a="hist-del"][data-id="100"]'));await sleep(40);
   t.ok(!sh.store.has(P_BETA+'history/100'),'graph point deleted without dialog');
@@ -97,12 +112,33 @@ module.exports=async t=>{
 
   t.ok(A.errors.length===0,'no script errors'+(A.errors.length?': '+A.errors[0]:''));
 
+  // ---- expenses above income: plain text, no duplicated amount ----
+  const shX=makeShared();seedData(shX);shX.store.set(P_BETA+'tx/big',{type:'expense',amount:20000,categoryId:'food',catName:'אוכל',date:D1,note:'',createdAt:9});
+  const X=openApp(shX);await sleep(200);
+  const homeTxt=X.$('.flow').textContent;
+  t.ok(/ההוצאות עולות על ההכנסות/.test(homeTxt)&&!/[<>]/.test(homeTxt),'home: expenses > income, no HTML code in the text');
+  X.tab('tx');await sleep(30);
+  t.ok(/ההוצאות עולות על ההכנסות/.test(X.$('.tx-save-rate').textContent)&&!/[<>]/.test(X.$('.tx-save-rate').textContent),'transactions: expenses > income, no HTML code');
+  t.ok(!/\(₪|\(.*8,675/.test(A.$('.flow')?A.$('.flow').textContent:''),'home: savings line does not repeat the cash-flow amount');
+
   // ---- share: only the file (no title → no extra text file on iPhone) ----
   const shares=[];
   const sh2=makeShared();seedData(sh2);
   const B=openApp(sh2,{beforeParse(w){w.navigator.canShare=()=>true;w.navigator.share=d=>{shares.push(d);return Promise.resolve();};}});
   await sleep(150);B.tab('settings');B.click(B.$$('[data-a="bk"]')[0]);await sleep(150);B.click(B.$('[data-a="bk-save"]'));await sleep(20);
   t.ok(shares.length===1&&Object.keys(shares[0]).join()==='files','share gets only the file, no title/text');
+
+  // ---- export: busy message stays; offline → immediate message ----
+  let rel;B.fake.fs.getDocsFromServer=()=>new Promise(r=>{rel=r;});
+  B.click(B.$$('[data-a="bk"]')[0]);await sleep(2600);
+  t.ok(/מכין גיבוי/.test(B.toast())&&B.$('#toast').classList.contains('show'),'export: "מכין גיבוי…" stays visible while waiting');
+  rel({docs:[],metadata:{fromCache:false}});await sleep(60);
+  t.ok(B.sheetOpen()&&!B.$('#toast').classList.contains('show'),'export ready: sheet opens, busy message gone');
+  B.click(B.$('[data-a="sheet-close"]')||B.$('#overlay'));await sleep(20);
+  Object.defineProperty(B.w.navigator,'onLine',{value:false,configurable:true});
+  B.click(B.$$('[data-a="bk"]')[0]);await sleep(20);
+  t.ok(/דורש חיבור לאינטרנט/.test(B.toast()),'export offline: message right away');
+  Object.defineProperty(B.w.navigator,'onLine',{value:true,configurable:true});
 
   // ---- beta error code in the message ----
   B.fake.fs.getDocsFromServer=async()=>{throw Object.assign(new Error('x'),{code:'unavailable'});};
