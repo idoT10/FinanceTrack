@@ -490,7 +490,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.1.0',APP_BUILD='b1',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.3',APP_BUILD='b2',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history'];
 
@@ -672,16 +672,22 @@ const D={
   },
   delHist(t){this.w(this.F.deleteDoc(this.ref('history',String(t))));},
   putHist(p){this.w(this.F.setDoc(this.ref('history',String(p.t)),p));},
-  /* ביטול מחיקה של נכס/התחייבות: מחזירים את הפריט ומוחקים את הנקודה שנוספה לגרף במחיקה */
-  restoreItem(kind,x,ptT){
-    const b=this.F.writeBatch(this.db),{id,...r}=x;
-    b.set(this.ref(this.itemCol(kind),id),r);
+  /* ביטול פעולה על נכס/התחייבות: prev=הגרסה הקודמת (או null אם הפריט נוסף עכשיו ולכן נמחק),
+     ptT=הנקודה שנוספה לגרף בפעולה ועכשיו נמחקת */
+  revertItem(kind,id,prev,ptT){
+    const b=this.F.writeBatch(this.db);
+    if(prev){const {id:_,...r}=prev;b.set(this.ref(this.itemCol(kind),id),r);}else b.delete(this.ref(this.itemCol(kind),id));
     if(ptT)b.delete(this.ref('history',String(ptT)));
     this.w(b.commit());
   },
   bulk(ups,pt){
     const ops=ups.map(u=>({ref:this.ref(this.itemCol(u.kind),u.id),update:true,data:{value:u.value,updatedAt:u.updatedAt}}));
     if(pt)ops.push({ref:this.ref('history',String(pt.t)),data:pt});
+    this.w(this.runOps(ops));
+  },
+  bulkRevert(ups,ptT){
+    const ops=ups.map(u=>({ref:this.ref(this.itemCol(u.kind),u.id),update:true,data:{value:u.value,updatedAt:u.updatedAt}}));
+    if(ptT)ops.push({ref:this.ref('history',String(ptT)),del:true});
     this.w(this.runOps(ops));
   },
   /* כל כתיבה בודקת את allowlist בכללי האבטחה (קריאת exists אחת), ו-Firestore מגביל batch ל-20 קריאות כאלה.
@@ -896,7 +902,9 @@ function toast(msg,kind,undo){
   if(undoFn)el.innerHTML='<span>'+esc(msg)+'</span><button class="toast-undo" data-a="undo">בטל</button>';
   else el.textContent=msg;
   el.className='toast show'+(kind?' '+kind:'')+(undoFn?' undo':'');
-  clearTimeout(toastTimer);toastTimer=setTimeout(()=>{el.className='toast';undoFn=null;},undoFn?UNDO_MS:2300);
+  clearTimeout(toastTimer);
+  if(kind==='busy')return;   // הודעת "עובד…" נשארת עד ההודעה הבאה
+  toastTimer=setTimeout(()=>{el.className='toast';undoFn=null;},undoFn?UNDO_MS:2300);
 }
 function runUndo(){
   const fn=undoFn;undoFn=null;clearTimeout(toastTimer);$('#toast').className='toast';
@@ -919,6 +927,7 @@ function askConfirm(msg,opt){
   });
 }
 function openSheet(html){
+  {const t=$('#toast');if(t.classList.contains('busy'))t.className='toast';}   // חלון שנפתח בסוף פעולה מחליף את "עובד…"
   const sh=$('#sheet');
   sh.innerHTML='<div class="grab"></div>'+html;
   sh.scrollTop=0;
@@ -1041,10 +1050,9 @@ function bannerHtml(){
 /* שיעור חיסכון = (הכנסות פחות הוצאות) חלקי הכנסות. rate=null כשאין מה לחשב או כשההוצאות גבוהות מההכנסות */
 function saveRate(inc,exp){
   if(!(inc>0))return{rate:null,text:'עוד לא נרשמו הכנסות בחודש הזה.'};
-  if(exp>inc)return{rate:null,text:'ההוצאות עולות על ההכנסות ב־'+money(r2(exp-inc))+'.'};
+  if(exp>inc)return{rate:null,text:'ההוצאות עולות על ההכנסות החודש.'};
   const rate=pct(inc-exp,inc);
-  return{rate,text:'חסכת '+rate+'% מההכנסות ('+money(r2(inc-exp))+').',
-    html:'חסכת <b>'+rate+'%</b> מההכנסות ('+money(r2(inc-exp))+')'};
+  return{rate,text:'חסכת '+rate+'% מההכנסות.',html:'חסכת <b>'+rate+'%</b> מההכנסות'};
 }
 /* חיפוש בחודש שמוצג: מספר = לפי סכום (120 מוצא 120 ו-120.50) או בהערה; טקסט = בהערה ובשם הקטגוריה */
 function matchQ(t,q){
@@ -1113,7 +1121,7 @@ function viewTx(){
   h+='<div class="tri"><div><span>הכנסות</span><b class="pos">'+money(tot.inc)+'</b></div><div><span>הוצאות</span><b class="neg">'+money(tot.exp)+'</b></div><div><span>תזרים</span><b>'+money(tot.net,{sign:true})+'</b></div></div>';
   if(monthTx.length&&tot.inc>0){
     const sr=saveRate(tot.inc,tot.exp);
-    h+='<div class="tx-save-rate">'+(sr.rate===null?esc(sr.text):'שיעור חיסכון <b>'+sr.rate+'%</b>')+'</div>';
+    h+='<div class="tx-save-rate">'+(sr.rate===null?'ההוצאות עולות על ההכנסות':'שיעור חיסכון <b>'+sr.rate+'%</b>')+'</div>';
   }
   h+='<div class="search"><input class="input" id="tx-search" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" '+
     'placeholder="חיפוש בהערה, קטגוריה או סכום" aria-label="חיפוש תנועות בחודש" value="'+esc(S.txQ)+'">'+
@@ -1370,9 +1378,10 @@ function saveNw(){
   if(!raw.trim()||!(value>=0)){toast('צריך סכום תקין');focusEl($('#n-value'));return;}
   const name=$('#n-name').value.trim()||cats.find(c=>c.id===f.category).name;
   const now=Date.now();
-  let item;
+  let item,prev=null;
   if(f.id){
     item=list.find(i=>i.id===f.id);if(!item)return;
+    prev=Object.assign({},item);
     Object.assign(item,{name,category:f.category,value,updatedAt:now});
   }else{
     item={id:uid(),name,category:f.category,value,updatedAt:now};
@@ -1381,7 +1390,14 @@ function saveNw(){
   const pt=snapshot((f.id?'עדכון: ':'הוספה: ')+name);
   const edited=!!f.id,nk=f.nk;
   D.putItem(nk,item,pt);closeSheet();render();
-  toast(edited?(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר'):(nk==='asset'?'הנכס נוסף':'ההתחייבות נוספה'));
+  const iid=item.id;
+  toast(edited?(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר'):(nk==='asset'?'הנכס נוסף':'ההתחייבות נוספה'),'',()=>{
+    const lst=nk==='asset'?S.nw.assets:S.nw.liabilities,cur=lst.find(i=>i.id===iid);
+    if(prev){if(cur)Object.assign(cur,prev);else lst.push(Object.assign({},prev));}
+    else{const i=lst.indexOf(cur);if(i>=0)lst.splice(i,1);}
+    if(pt)S.nw.history=S.nw.history.filter(p=>p.t!==pt.t);
+    D.revertItem(nk,iid,prev,pt&&pt.t);render();toast(prev?'העדכון בוטל':'ההוספה בוטלה');
+  });
 }
 
 /* ================= sheets: categories ================= */
@@ -1455,10 +1471,15 @@ function saveBulk(){
     changes.push({kind,x,v});
   }
   if(!changes.length){closeSheet();return;}
+  const olds=changes.map(({kind,x})=>({kind,id:x.id,value:x.value,updatedAt:x.updatedAt}));
   const ups=changes.map(({kind,x,v})=>{x.value=v;x.updatedAt=now;return{kind,id:x.id,value:v,updatedAt:now};});
   const pt=snapshot('עדכון מלא');
   D.bulk(ups,pt);closeSheet();render();
-  toast(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר');
+  toast(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר','',()=>{
+    for(const o of olds){const x=(o.kind==='asset'?S.nw.assets:S.nw.liabilities).find(i=>i.id===o.id);if(x){x.value=o.value;x.updatedAt=o.updatedAt;}}
+    if(pt)S.nw.history=S.nw.history.filter(p=>p.t!==pt.t);
+    D.bulkRevert(olds,pt&&pt.t);render();toast('העדכון המלא בוטל');
+  });
 }
 
 /* ================= sheet: קטגוריה (עם ספירת שימוש מהשרת) ================= */
@@ -1523,7 +1544,8 @@ async function openStatsSheet(){
 /* ייצוא בשני שלבים: קודם מכינים את הקובץ (קריאה מהשרת), ואז המשתמש לוחץ "שמירת הקובץ".
    באייפון חלון השיתוף נפתח רק ישירות מלחיצה, ולא אחרי המתנה לשרת. */
 async function doExport(){
-  toast('מכין גיבוי…');
+  if(navigator.onLine===false){toast('הגיבוי דורש חיבור לאינטרנט','err');return;}
+  toast('מכין גיבוי…','busy');
   let all;
   try{
     all=await Promise.race([D.allTx(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000))]);
@@ -1630,7 +1652,7 @@ function importSummary(plan){
   return rows.join('');
 }
 async function runImport(plan){
-  toast('מייבא…');
+  toast('מייבא…','busy');
   try{
     const a=plan.add;
     await D.importAll({categories:a.categories,transactions:a.transactions},{assets:a.assets,liabilities:a.liabilities,history:a.history});
@@ -1642,7 +1664,7 @@ async function importFile(file){
   try{obj=JSON.parse(await file.text());}catch(e){toast('הקובץ אינו גיבוי תקין','err');return;}
   if(!obj||typeof obj!=='object'||!obj.tx||!obj.nw){toast('הקובץ אינו גיבוי של הדשבורד','err');return;}
   const bTx=normTx(obj.tx),bNw=normNw(obj.nw);
-  toast('בודק מה כבר קיים…');
+  toast('בודק מה כבר קיים…','busy');
   let curTx;
   try{
     curTx=await Promise.race([D.allTx(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000))]);
@@ -1720,7 +1742,7 @@ document.addEventListener('click',async e=>{
         const lst=nk==='asset'?S.nw.assets:S.nw.liabilities;
         if(!lst.some(i=>i.id===copy.id))lst.push(copy);
         if(pt)S.nw.history=S.nw.history.filter(p=>p.t!==pt.t);
-        D.restoreItem(nk,copy,pt&&pt.t);render();toast('"'+copy.name+'" הוחזר');
+        D.revertItem(nk,copy.id,copy,pt&&pt.t);render();toast('"'+copy.name+'" הוחזר');
       });
       break;
     }
@@ -1767,7 +1789,7 @@ document.addEventListener('click',async e=>{
     case 'beta-copy':{
       if(ENV!=='beta')break;
       if(!await askConfirm('להחליף את נתוני הבדיקה בעותק של הנתונים האמיתיים? הנתונים האמיתיים לא ישתנו.',{ok:'העתקה'}))break;
-      toast('מעתיק…');
+      toast('מעתיק…','busy');
       try{const n=await D.betaCopyFromProd();toast('הועתקו '+n+' מסמכים לסביבת הבדיקה');}
       catch(err){console.error(err);toast('ההעתקה נכשלה. בדקו את החיבור ונסו שוב'+errTag(err),'err');}
       break;
@@ -1775,7 +1797,7 @@ document.addEventListener('click',async e=>{
     case 'beta-wipe':{
       if(ENV!=='beta')break;
       if(!await askConfirm('למחוק את כל נתוני הבדיקה? הנתונים האמיתיים לא ישתנו.',{ok:'ניקוי',danger:true}))break;
-      toast('מנקה…');
+      toast('מנקה…','busy');
       try{const n=await D.betaWipe();toast('נוקו '+n+' מסמכים מסביבת הבדיקה');}
       catch(err){console.error(err);toast('הניקוי נכשל. בדקו את החיבור ונסו שוב'+errTag(err),'err');}
       break;
@@ -1787,7 +1809,7 @@ document.addEventListener('click',async e=>{
     }
     case 'reset':{
       if(!await askConfirm('למחוק לצמיתות את כל התנועות, הקטגוריות, הנכסים וההיסטוריה? כדאי לייצא גיבוי קודם.',{ok:'מחיקת הכל',danger:true}))break;
-      toast('מוחק…');
+      toast('מוחק…','busy');
       let txIds;
       try{txIds=await D.txIds();}catch(err){console.error(err);toast('המחיקה דורשת חיבור לאינטרנט'+errTag(err),'err');break;}
       const old={cats:S.tx.categories.map(c=>c.id),txs:txIds,assets:S.nw.assets.map(x=>x.id),
