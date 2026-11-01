@@ -512,7 +512,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.4',APP_BUILD='b3',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.4',APP_BUILD='b4',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history'];
 
@@ -1047,6 +1047,35 @@ function closeSheet(){
   const ae=document.activeElement;if(ae&&ae.blur)ae.blur();
   S.form=null;
 }
+/* החלקה למטה סוגרת חלון: רק כשהחלון גלול לגמרי למעלה, ורק בתנועה אנכית (לא בגלילה לצדדים של שורות) */
+(function sheetSwipe(){
+  const sh=document.getElementById('sheet');if(!sh)return;
+  let y0=0,x0=0,t0=0,dy=0,drag=false,armed=false;
+  const pt=e=>e.touches&&e.touches[0]||e.changedTouches&&e.changedTouches[0]||e;
+  sh.addEventListener('touchstart',e=>{
+    if(!sh.classList.contains('open'))return;
+    const p=pt(e);y0=p.clientY;x0=p.clientX;t0=Date.now();dy=0;drag=false;armed=sh.scrollTop<=0;
+  },{passive:true});
+  sh.addEventListener('touchmove',e=>{
+    if(!armed)return;
+    const p=pt(e),d=p.clientY-y0,dx=p.clientX-x0;
+    if(!drag){
+      if(d>8&&Math.abs(d)>Math.abs(dx)*1.2&&sh.scrollTop<=0){drag=true;sh.style.transition='none';}
+      else if(Math.abs(dx)>8||d<-8){armed=false;return;}
+      else return;
+    }
+    dy=Math.max(0,d);sh.style.transform='translateY('+dy+'px)';
+    if(e.cancelable)e.preventDefault();
+  },{passive:false});
+  const end=()=>{
+    if(!drag){armed=false;return;}
+    drag=false;armed=false;
+    const v=dy/Math.max(1,Date.now()-t0);
+    sh.style.transition='';sh.style.transform='';
+    if(dy>110||(dy>40&&v>0.5))closeSheet();
+  };
+  sh.addEventListener('touchend',end);sh.addEventListener('touchcancel',end);
+})();
 const sheetHead=t=>'<div class="sheet-head"><h2>'+esc(t)+'</h2><button class="icon-btn" data-a="sheet-close" aria-label="סגירה">'+ICON.x+'</button></div>';
 function fitSheet(){
   const vv=window.visualViewport,sh=$('#sheet');
