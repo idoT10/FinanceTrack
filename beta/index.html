@@ -168,6 +168,9 @@ h2.h{font-size:15px;font-weight:650;color:var(--ink-2)}
 .chips.scroll::-webkit-scrollbar{display:none}
 .chips.line{overflow-x:auto;scrollbar-width:none;margin:0 -18px;padding:2px 18px}
 .chips.line::-webkit-scrollbar{display:none}
+/* קטגוריות: גוש של כמה שורות שנגלל לצדדים */
+.chips.block{display:grid;grid-auto-flow:column;grid-template-rows:repeat(var(--rows,1),auto);justify-content:start;overflow-x:auto;scrollbar-width:none;margin:0 -18px;padding:2px 18px}
+.chips.block::-webkit-scrollbar{display:none}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;background:var(--surface);border:1.5px solid var(--line);font-size:14.5px;font-weight:560;white-space:nowrap;flex:none}
 .chip.on{border-color:var(--c,var(--accent));background:color-mix(in srgb,var(--c,var(--accent)) 15%,var(--surface))}
 .chip.add{border-style:dashed;color:var(--accent)}
@@ -509,7 +512,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.4',APP_BUILD='b2',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.4',APP_BUILD='b3',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history'];
 
@@ -1412,12 +1415,12 @@ function openTxSheet(id){
   if(t&&t.type==='adjust'){openAdjustSheet(t);return;}
   const f=S.form={kind:'tx',id:t?t.id:null,type:t?t.type:'expense',
     categoryId:t&&S.tx.categories.some(c=>c.id===t.categoryId)?t.categoryId:null,date:t?t.date:todayStr(),
-    accountId:t?(t.accountId||null):lastAcct('expense'),fromId:t?(t.fromId||null):lastAcct('expense'),toId:t&&t.toId||null,catsAll:false};
+    accountId:t?(t.accountId||null):lastAcct('expense'),fromId:t?(t.fromId||null):lastAcct('expense'),toId:t&&t.toId||null};
   const html=sheetHead(t?'עריכת תנועה':'הוספה מהירה')+
     '<div class="seg" id="f-type"><button data-a="f-type" data-v="expense">הוצאה</button><button data-a="f-type" data-v="income">הכנסה</button><button data-a="f-type" data-v="transfer">העברה</button></div>'+
     '<label class="amount-wrap" id="f-amount-wrap"><span class="cur">₪</span><input id="f-amount" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" aria-label="סכום" value="'+(t?t.amount:'')+'"></label>'+
     '<div class="field-label">תיאור</div><input id="f-note" class="input" placeholder="למשל: קפה עם דני" enterkeyhint="done" autocomplete="off" value="'+esc(t?t.note:'')+'">'+
-    '<div id="f-cat-sec"><div class="field-label">קטגוריה</div><div class="chips wrap" id="f-cats"></div>'+
+    '<div id="f-cat-sec"><div class="field-label">קטגוריה</div><div class="chips block" id="f-cats"></div>'+
     '<div class="newcat" id="f-newcat" hidden><input id="f-newcat-icon" class="input emoji-in" maxlength="8" value="🏷️" aria-label="אייקון"><input id="f-newcat-name" class="input grow" placeholder="שם הקטגוריה" enterkeyhint="done"><button class="btn primary" style="padding:12px 16px" data-a="f-newcat-save">הוספה</button></div></div>'+
     '<div id="f-acct-sec"><div class="field-label" id="f-acct-label">מאיזה חשבון</div><div class="chips line" id="f-accts"></div></div>'+
     '<div id="f-xfer-sec"><div class="field-label">מחשבון</div><div class="chips line" id="f-from"></div><div class="field-label">לחשבון</div><div class="chips line" id="f-to"></div></div>'+
@@ -1436,6 +1439,16 @@ function openAdjustSheet(t){
     '<p class="muted small">'+esc(dayLabel(t.date))+(t.note?' · '+esc(t.note):'')+'. מחיקה מחזירה את היתרה למה שהייתה לפני ההתאמה.</p>'+
     '<div class="sheet-actions"><button class="btn ghost danger" data-a="tx-del">מחיקה</button><button class="btn primary grow" data-a="sheet-close">סגירה</button></div>');
 }
+/* בשורה שנגללת לצדדים: מוודאים שהבחירה המסומנת נראית (רק גלילה אופקית, בלי להזיז את החלון) */
+function scrollToOn(box){
+  const on=box&&box.querySelector('.chip.on');if(!on||!box.getBoundingClientRect)return;
+  requestAnimationFrame(()=>{
+    const b=box.getBoundingClientRect(),c=on.getBoundingClientRect(),pad=18;
+    if(!b.width)return;
+    if(c.left<b.left+pad)box.scrollLeft+=c.left-b.left-pad;
+    else if(c.right>b.right-pad)box.scrollLeft+=c.right-b.right+pad;
+  });
+}
 const acctChip=(a,on,act)=>'<button class="chip '+(on?'on':'')+'" style="--c:'+acctCat(a).color+'" data-a="'+act+'" data-id="'+esc(a.x.id)+'">'+esc(acctCat(a).icon)+' '+esc(a.x.name)+'</button>';
 function renderAcctChips(){
   const f=S.form;if(!f)return;
@@ -1444,6 +1457,7 @@ function renderAcctChips(){
   sec.hidden=f.type==='transfer'||!live.length;
   $('#f-acct-label').textContent=f.type==='income'?'לאיזה חשבון':'מאיזה חשבון';
   box.innerHTML='<button class="chip '+(!f.accountId?'on':'')+'" data-a="f-acct" data-id="">בלי חשבון</button>'+live.map(a=>acctChip(a,f.accountId===a.x.id,'f-acct')).join('');
+  scrollToOn(box);
 }
 function renderXferChips(){
   const f=S.form;if(!f)return;
@@ -1451,6 +1465,7 @@ function renderXferChips(){
   const none='<span class="muted small" style="align-self:center">צריך לפחות שני חשבונות. מוסיפים אותם במסך השווי הנקי.</span>';
   $('#f-from').innerHTML=all.length<2?none:all.map(a=>acctChip(a,f.fromId===a.x.id,'f-from')).join('');
   $('#f-to').innerHTML=all.length<2?'':all.filter(a=>a.x.id!==f.fromId).map(a=>acctChip(a,f.toId===a.x.id,'f-to')).join('');
+  scrollToOn($('#f-from'));scrollToOn($('#f-to'));
 }
 function syncTxType(){
   const v=S.form.type,cls=v==='expense'?'exp':v==='income'?'inc':'xfer';
@@ -1465,13 +1480,13 @@ function renderCatChips(){
   const counts=usageCounts();
   const all=S.tx.categories.map((c,i)=>({c,i})).filter(o=>o.c.type===f.type)
     .sort((a,b)=>(counts[b.c.id]||0)-(counts[a.c.id]||0)||a.i-b.i).map(o=>o.c);
-  // מציגים את 8 הנפוצות (ואת הנבחרת אם היא מחוצה להן), והשאר מאחורי "עוד"
-  const TOP=8,many=!f.catsAll&&all.length>TOP+1;
-  const cats=many?all.filter((c,i)=>i<TOP||c.id===f.categoryId):all;
+  // כל הקטגוריות, הנפוצות ראשונות, בגוש של עד 3 שורות שנגלל לצדדים
+  const cats=all,n=cats.length+1;
+  box.style.setProperty('--rows',n>8?3:n>3?2:1);
   box.innerHTML=(all.length?'':'<span class="muted small" style="align-self:center">עוד אין קטגוריות מסוג זה.</span>')+
     cats.map(c=>'<button class="chip '+(f.categoryId===c.id?'on':'')+'" style="--c:'+c.color+'" data-a="f-cat" data-id="'+esc(c.id)+'">'+esc(c.icon)+' '+esc(c.name)+'</button>').join('')+
-    (many?'<button class="chip add" data-a="f-cat-more">עוד ('+(all.length-cats.length)+')</button>':'')+
     '<button class="chip add" data-a="f-newcat">＋ חדשה</button>';
+  scrollToOn(box);
 }
 function syncDateChips(){
   const d=S.form.date;
@@ -1902,8 +1917,7 @@ document.addEventListener('click',async e=>{
     case 'range':S.range=v;render();break;
     case 'sheet-close':closeSheet();break;
 
-    case 'f-type':if(f&&f.type!==v){f.type=v;f.categoryId=null;f.catsAll=false;if(!f.id&&v!=='transfer')f.accountId=lastAcct(v);syncTxType();}break;
-    case 'f-cat-more':if(f){f.catsAll=true;renderCatChips();}break;
+    case 'f-type':if(f&&f.type!==v){f.type=v;f.categoryId=null;if(!f.id&&v!=='transfer')f.accountId=lastAcct(v);syncTxType();}break;
     case 'f-acct':if(f){f.accountId=id||null;renderAcctChips();}break;
     case 'f-from':if(f){f.fromId=id;if(f.toId===id)f.toId=null;renderXferChips();}break;
     case 'f-to':if(f){f.toId=id;renderXferChips();}break;
