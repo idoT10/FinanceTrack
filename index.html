@@ -166,6 +166,11 @@ h2.h{font-size:15px;font-weight:650;color:var(--ink-2)}
 .chips.wrap{flex-wrap:wrap}
 .chips.scroll{overflow-x:auto;scrollbar-width:none;margin:12px -16px 4px;padding:2px 16px}
 .chips.scroll::-webkit-scrollbar{display:none}
+.chips.line{overflow-x:auto;scrollbar-width:none;margin:0 -18px;padding:2px 18px}
+.chips.line::-webkit-scrollbar{display:none}
+/* קטגוריות: גוש של כמה שורות שנגלל לצדדים */
+.chips.block{display:grid;grid-auto-flow:column;grid-template-rows:repeat(var(--rows,1),auto);justify-content:start;overflow-x:auto;scrollbar-width:none;margin:0 -18px;padding:2px 18px}
+.chips.block::-webkit-scrollbar{display:none}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;background:var(--surface);border:1.5px solid var(--line);font-size:14.5px;font-weight:560;white-space:nowrap;flex:none}
 .chip.on{border-color:var(--c,var(--accent));background:color-mix(in srgb,var(--c,var(--accent)) 15%,var(--surface))}
 .chip.add{border-style:dashed;color:var(--accent)}
@@ -212,6 +217,7 @@ textarea.input{min-height:130px;direction:ltr;text-align:left;resize:vertical;fo
 .amount-wrap.exp input{color:var(--expense)}.amount-wrap.inc input{color:var(--income)}
 .date-row{display:flex;gap:8px;align-items:center}
 .date-row .input{flex:1;min-width:0}
+[hidden]{display:none!important}   /* אחרת display של מחלקה גובר על hidden */
 .newcat{display:flex;gap:8px;margin-top:10px;align-items:center}
 .emoji-in{width:58px!important;flex:none;text-align:center;font-size:20px;padding:10px 4px}
 .emoji-pick{display:flex;flex-wrap:wrap;gap:2px;margin-top:10px}
@@ -409,21 +415,31 @@ const firebaseConfig = {
   appId: "1:559069571788:web:1cc9476232f89fbd3c7069"
 };
 const FB_VER = '10.14.1';
+/* סוגי חשבונות. הקבוצה נגזרת מהסוג (acctGroup): שוטף = יתרה מתעדכנת מהתנועות; חיסכון/חובות = עדכון ידני */
 const ASSET_CATS=[
+  {id:'checking',name:'עו"ש',icon:'🏛️',color:'#2F7FA8'},
+  {id:'cash',name:'מזומן / ארנק דיגיטלי',icon:'💵',color:'#2A98A8'},
+  {id:'deposit',name:'פיקדון / חיסכון בבנק',icon:'🐷',color:'#B3568A'},
   {id:'gemel',name:'קופת גמל',icon:'🏦',color:'#2E8B6E'},
   {id:'hishtalmut',name:'קרן השתלמות',icon:'🎓',color:'#3F6FB5'},
   {id:'pension',name:'פנסיה',icon:'🌿',color:'#8C6B2F'},
   {id:'trading',name:'תיק מסחר עצמאי',icon:'📈',color:'#7153A8'},
-  {id:'cash',name:'מזומן / עו"ש',icon:'💵',color:'#2A98A8'},
   {id:'realestate',name:'נדל"ן',icon:'🏠',color:'#C0704A'},
   {id:'other',name:'אחר',icon:'📦',color:'#7C8580'}
 ];
 const LIAB_CATS=[
   {id:'mortgage',name:'משכנתא',icon:'🏡',color:'#C83E52'},
   {id:'loan',name:'הלוואה',icon:'📄',color:'#D0663A'},
-  {id:'credit',name:'אשראי / מינוס',icon:'💳',color:'#C9922E'},
+  {id:'credit',name:'כרטיס אשראי',icon:'💳',color:'#C9922E'},
   {id:'other',name:'אחר',icon:'📦',color:'#7C8580'}
 ];
+const GROUPS=[
+  {id:'live',name:'כסף שוטף',hint:'היתרה מתעדכנת מהתנועות'},
+  {id:'save',name:'חיסכון והשקעות',hint:'מעדכנים ידנית'},
+  {id:'debt',name:'חובות',hint:'מעדכנים ידנית'}
+];
+const LIVE_CATS={asset:['checking','cash'],liab:['credit']};
+const acctGroup=(kind,cat)=>LIVE_CATS[kind].includes(cat)?'live':kind==='asset'?'save':'debt';
 const PALETTE=['#C83E52','#D0663A','#C9A12E','#4E9A5F','#2A98A8','#3F6FB5','#7153A8','#B3568A','#7C8580'];
 const EMOJIS=['🛒','☕','🍔','🚗','⛽','🚌','🏠','💡','📱','🎬','🛍️','👕','💊','🎁','✈️','🐶','👶','📚','🏋️','🍷','💼','✨','💰','🧾','🔧','🎮'];
 const DEFAULT_CATS=[
@@ -449,6 +465,9 @@ const S={
 };
 
 /* ================= storage ================= */
+/* expense/income: תנועה רגילה (אופציונלית עם accountId). transfer: fromId→toId, בלי קטגוריה.
+   adjust: רשומת עדכון/התאמה של יתרת חשבון (accountId, delta, value). לא נספרת בתזרים ובחיסכון */
+const TX_TYPES=['expense','income','transfer','adjust'];
 function normTx(o){
   o=o||{};
   const cats=(Array.isArray(o.categories)?o.categories:[]).filter(c=>c&&c.id&&c.name).map(c=>({
@@ -457,8 +476,11 @@ function normTx(o){
     color:/^#[0-9a-f]{6}$/i.test(c.color)?c.color:PALETTE[8]
   }));
   const txs=(Array.isArray(o.transactions)?o.transactions:[]).filter(t=>t&&t.id&&/^\d{4}-\d{2}-\d{2}$/.test(t.date)&&isFinite(+t.amount)).map(t=>({
-    id:String(t.id),type:t.type==='income'?'income':'expense',amount:r2(+t.amount),
-    categoryId:t.categoryId?String(t.categoryId):null,catName:String(t.catName||''),date:t.date,note:String(t.note||''),createdAt:+t.createdAt||0
+    id:String(t.id),type:TX_TYPES.includes(t.type)?t.type:'expense',amount:r2(+t.amount),
+    categoryId:t.categoryId?String(t.categoryId):null,catName:String(t.catName||''),date:t.date,note:String(t.note||''),createdAt:+t.createdAt||0,
+    ...(t.accountId?{accountId:String(t.accountId)}:{}),
+    ...(t.type==='transfer'?{fromId:String(t.fromId||''),toId:String(t.toId||'')}:{}),
+    ...(t.type==='adjust'?{delta:r2(+t.delta||0),value:r2(+t.value||0)}:{})
   }));
   return{categories:cats,transactions:txs};
 }
@@ -490,7 +512,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.3',APP_BUILD='b2',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.4',APP_BUILD='b4',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history'];
 
@@ -521,7 +543,7 @@ const SKEL='<div class="skel" style="height:150px"></div><div class="skel" style
 function markLoaded(k){
   S.loaded[k]=true;
   const first=!S.ready&&LOAD_KEYS.every(x=>S.loaded[x]);
-  if(first)S.ready=true;
+  if(first){S.ready=true;try{ensureMonthlyPoint();}catch(e){console.error(e);}}
   if(S.ready)render();
   if(first&&S.quick){S.quick=false;openTxSheet();}
 }
@@ -656,12 +678,20 @@ const D={
   putCat(c){const {id,...r}=c;this.w(this.F.setDoc(this.ref('categories',id),r));},
   delCat(id){this.w(this.F.deleteDoc(this.ref('categories',id)));},
   putTx(t){const {id,...r}=t;this.w(this.F.setDoc(this.ref('tx',id),r));},
+  /* תנועה + עדכון יתרות באותה פעולה. increment מתחבר נכון גם כששני מכשירים או מצב לא מקוון כותבים במקביל */
+  txWrite(t,fx){
+    const b=this.F.writeBatch(this.db);
+    if(t.del)b.delete(this.ref('tx',t.id));else{const {id,...r}=t;b.set(this.ref('tx',id),r);}
+    (fx||[]).forEach(e=>b.update(this.ref(this.itemCol(e.kind),e.id),{value:this.F.increment(e.d)}));
+    this.w(b.commit());
+  },
   delTx(id){this.w(this.F.deleteDoc(this.ref('tx',id)));},
   itemCol(kind){return kind==='asset'?'assets':'liabilities';},
-  putItem(kind,x,pt){
+  putItem(kind,x,pt,rec){
     const b=this.F.writeBatch(this.db),{id,...r}=x;
     b.set(this.ref(this.itemCol(kind),id),r);
     if(pt)b.set(this.ref('history',String(pt.t)),pt);
+    if(rec){const {id:rid,...rr}=rec;b.set(this.ref('tx',rid),rr);}
     this.w(b.commit());
   },
   delItem(kind,id,pt){
@@ -674,20 +704,23 @@ const D={
   putHist(p){this.w(this.F.setDoc(this.ref('history',String(p.t)),p));},
   /* ביטול פעולה על נכס/התחייבות: prev=הגרסה הקודמת (או null אם הפריט נוסף עכשיו ולכן נמחק),
      ptT=הנקודה שנוספה לגרף בפעולה ועכשיו נמחקת */
-  revertItem(kind,id,prev,ptT){
+  revertItem(kind,id,prev,ptT,recId){
     const b=this.F.writeBatch(this.db);
     if(prev){const {id:_,...r}=prev;b.set(this.ref(this.itemCol(kind),id),r);}else b.delete(this.ref(this.itemCol(kind),id));
     if(ptT)b.delete(this.ref('history',String(ptT)));
+    if(recId)b.delete(this.ref('tx',recId));
     this.w(b.commit());
   },
-  bulk(ups,pt){
+  bulk(ups,pt,recs){
     const ops=ups.map(u=>({ref:this.ref(this.itemCol(u.kind),u.id),update:true,data:{value:u.value,updatedAt:u.updatedAt}}));
     if(pt)ops.push({ref:this.ref('history',String(pt.t)),data:pt});
+    (recs||[]).forEach(r=>{const {id,...d}=r;ops.push({ref:this.ref('tx',id),data:d});});
     this.w(this.runOps(ops));
   },
-  bulkRevert(ups,ptT){
+  bulkRevert(ups,ptT,recIds){
     const ops=ups.map(u=>({ref:this.ref(this.itemCol(u.kind),u.id),update:true,data:{value:u.value,updatedAt:u.updatedAt}}));
     if(ptT)ops.push({ref:this.ref('history',String(ptT)),del:true});
+    (recIds||[]).forEach(id=>ops.push({ref:this.ref('tx',id),del:true}));
     this.w(this.runOps(ops));
   },
   /* כל כתיבה בודקת את allowlist בכללי האבטחה (קריאת exists אחת), ו-Firestore מגביל batch ל-20 קריאות כאלה.
@@ -867,7 +900,65 @@ function enter(user){
 /* ================= domain ================= */
 const catView=id=>S.tx.categories.find(c=>c.id===id)||NONE;
 const catKey=t=>S.tx.categories.some(c=>c.id===t.categoryId)?t.categoryId:'_none';
-function sumTx(list){let inc=0,exp=0;for(const t of list){if(t.type==='income')inc+=t.amount;else exp+=t.amount;}return{inc:r2(inc),exp:r2(exp),net:r2(inc-exp)};}
+
+/* ================= חשבונות (R2) ================= */
+function acctOf(id){
+  if(!id)return null;
+  let x=S.nw.assets.find(i=>i.id===id);if(x)return{kind:'asset',x};
+  x=S.nw.liabilities.find(i=>i.id===id);return x?{kind:'liab',x}:null;
+}
+const acctName=id=>{const a=acctOf(id);return a?a.x.name:'חשבון שנמחק';};
+const acctCat=a=>(a.kind==='asset'?ASSET_CATS:LIAB_CATS).find(c=>c.id===a.x.category)||ASSET_CATS[ASSET_CATS.length-1];
+const isLive=a=>!!a&&acctGroup(a.kind,a.x.category)==='live';
+/* כל החשבונות לפי סדר הקבוצות: שוטף, חיסכון, חובות */
+function allAccts(){
+  const all=[...S.nw.assets.map(x=>({kind:'asset',x})),...S.nw.liabilities.map(x=>({kind:'liab',x}))];
+  const ord={live:0,save:1,debt:2};
+  return all.map((a,i)=>({a,i,g:ord[acctGroup(a.kind,a.x.category)]})).sort((p,q)=>p.g-q.g||p.i-q.i).map(o=>o.a);
+}
+const liveAccts=()=>allAccts().filter(isLive);
+/* השפעת תנועה על יתרות: [{id,kind,d}] כש-d הוא השינוי בשדה value.
+   נכס: כסף יוצא = פחות. התחייבות (כרטיס אשראי): כסף יוצא = החוב גדל */
+function txEffects(t){
+  const out=[];
+  const add=(id,dir)=>{const a=acctOf(id);if(a)out.push({id,kind:a.kind,d:(a.kind==='asset'?1:-1)*dir*t.amount});};
+  if(t.type==='expense'&&t.accountId)add(t.accountId,-1);
+  else if(t.type==='income'&&t.accountId)add(t.accountId,1);
+  else if(t.type==='transfer'){add(t.fromId,-1);add(t.toId,1);}
+  else if(t.type==='adjust'&&t.accountId){const a=acctOf(t.accountId);if(a)out.push({id:t.accountId,kind:a.kind,d:t.delta||0});}
+  return out;
+}
+function mergeFx(list){
+  const m=new Map();
+  for(const e of list){const k=e.kind+'|'+e.id,o=m.get(k);if(o)o.d=r2(o.d+e.d);else m.set(k,Object.assign({},e,{d:r2(e.d)}));}
+  return [...m.values()].filter(e=>e.d!==0);
+}
+const negFx=fx=>fx.map(e=>Object.assign({},e,{d:-e.d}));
+function applyFxLocal(fx){for(const e of fx){const a=acctOf(e.id);if(a)a.x.value=r2(a.x.value+e.d);}}
+/* שמירה/מחיקה של תנועה יחד עם עדכון היתרות (prev = הגרסה הקודמת בעריכה) */
+function saveTxFx(t,prev){const fx=mergeFx([...(prev?negFx(txEffects(prev)):[]),...txEffects(t)]);applyFxLocal(fx);D.txWrite(t,fx);}
+function delTxFx(t){const fx=mergeFx(negFx(txEffects(t)));applyFxLocal(fx);D.txWrite({id:t.id,del:true},fx);}
+/* החשבון האחרון נזכר בנפרד להוצאה ולהכנסה (לכל מכשיר). העברות לא משנות אותו */
+const lastAcctKey=type=>'fin-last-acct-'+ENV+'-'+(type==='income'?'income':'expense');
+function lastAcct(type){try{const id=localStorage.getItem(lastAcctKey(type));return id==='none'?null:(isLive(acctOf(id))?id:null);}catch(e){return null;}}
+function setLastAcct(type,id){try{localStorage.setItem(lastAcctKey(type),id||'none');}catch(e){}}
+/* העברות והתאמות לא נספרות בהכנסות, בהוצאות, בתזרים ובחיסכון */
+function sumTx(list){let inc=0,exp=0;for(const t of list){if(t.type==='income')inc+=t.amount;else if(t.type==='expense')exp+=t.amount;}return{inc:r2(inc),exp:r2(exp),net:r2(inc-exp)};}
+const isFlow=t=>t.type==='income'||t.type==='expense';
+const flowSigned=t=>t.type==='income'?t.amount:t.type==='expense'?-t.amount:0;
+/* מה מוצג ברשימות: הכול חוץ מעדכוני שווי של חשבונות חיסכון וחובות (הם לא תנועות) */
+const txVisible=t=>t.type!=='adjust'||isLive(acctOf(t.accountId));
+/* "הושקע": העברות מכסף שוטף לחיסכון, פחות משיכות מהחיסכון לכסף השוטף */
+function investedOf(list){
+  let s=0;
+  for(const t of list){
+    if(t.type!=='transfer')continue;
+    const f=acctOf(t.fromId),to=acctOf(t.toId);if(!f||!to)continue;
+    const gf=acctGroup(f.kind,f.x.category),gt=acctGroup(to.kind,to.x.category);
+    if(gf==='live'&&gt==='save')s+=t.amount;else if(gf==='save'&&gt==='live')s-=t.amount;
+  }
+  return r2(s);
+}
 const sortTx=(a,b)=>b.date.localeCompare(a.date)||(b.createdAt||0)-(a.createdAt||0);
 function nwTotals(){
   const a=r2(S.nw.assets.reduce((s,x)=>s+x.value,0));
@@ -881,8 +972,25 @@ function snapshot(note){
   h.push(pt);
   return pt;
 }
+/* הנקודה האחרונה בגרף היא תמיד השווי של עכשיו (מוצגת בלבד, לא נשמרת), כדי שהגרף והמספר הגדול יתאימו */
+function histWithNow(){
+  const h=S.nw.history,t=nwTotals(),last=h[h.length-1];
+  if(!S.nw.assets.length&&!S.nw.liabilities.length)return h;
+  if(last&&r2(last.a)===t.a&&r2(last.l)===t.l)return h;
+  return h.concat([{t:Math.max(Date.now(),last?last.t+1:0),a:t.a,l:t.l,n:t.n,note:'עכשיו',live:true}]);
+}
+/* נקודה שמורה אחת בחודש: בפתיחה הראשונה בחודש, אם אין עדיין נקודה בחודש הזה והשווי השתנה */
+function ensureMonthlyPoint(){
+  const mk=monthKey(new Date());
+  if(S.autoPointMk===mk)return;S.autoPointMk=mk;
+  if(!S.nw.assets.length&&!S.nw.liabilities.length)return;
+  const h=S.nw.history,last=h[h.length-1];
+  if(last&&monthKey(new Date(last.t))===mk)return;
+  const pt=snapshot('נקודה חודשית');
+  if(pt)D.putHist(pt);
+}
 function rangePoints(){
-  const h=S.nw.history;
+  const h=histWithNow();
   if(S.range==='all'||h.length<2)return h;
   const d=new Date();d.setMonth(d.getMonth()-({'3m':3,'6m':6,'1y':12}[S.range]||0));
   const from=d.getTime();
@@ -939,6 +1047,35 @@ function closeSheet(){
   const ae=document.activeElement;if(ae&&ae.blur)ae.blur();
   S.form=null;
 }
+/* החלקה למטה סוגרת חלון: רק כשהחלון גלול לגמרי למעלה, ורק בתנועה אנכית (לא בגלילה לצדדים של שורות) */
+(function sheetSwipe(){
+  const sh=document.getElementById('sheet');if(!sh)return;
+  let y0=0,x0=0,t0=0,dy=0,drag=false,armed=false;
+  const pt=e=>e.touches&&e.touches[0]||e.changedTouches&&e.changedTouches[0]||e;
+  sh.addEventListener('touchstart',e=>{
+    if(!sh.classList.contains('open'))return;
+    const p=pt(e);y0=p.clientY;x0=p.clientX;t0=Date.now();dy=0;drag=false;armed=sh.scrollTop<=0;
+  },{passive:true});
+  sh.addEventListener('touchmove',e=>{
+    if(!armed)return;
+    const p=pt(e),d=p.clientY-y0,dx=p.clientX-x0;
+    if(!drag){
+      if(d>8&&Math.abs(d)>Math.abs(dx)*1.2&&sh.scrollTop<=0){drag=true;sh.style.transition='none';}
+      else if(Math.abs(dx)>8||d<-8){armed=false;return;}
+      else return;
+    }
+    dy=Math.max(0,d);sh.style.transform='translateY('+dy+'px)';
+    if(e.cancelable)e.preventDefault();
+  },{passive:false});
+  const end=()=>{
+    if(!drag){armed=false;return;}
+    drag=false;armed=false;
+    const v=dy/Math.max(1,Date.now()-t0);
+    sh.style.transition='';sh.style.transform='';
+    if(dy>110||(dy>40&&v>0.5))closeSheet();
+  };
+  sh.addEventListener('touchend',end);sh.addEventListener('touchcancel',end);
+})();
 const sheetHead=t=>'<div class="sheet-head"><h2>'+esc(t)+'</h2><button class="icon-btn" data-a="sheet-close" aria-label="סגירה">'+ICON.x+'</button></div>';
 function fitSheet(){
   const vv=window.visualViewport,sh=$('#sheet');
@@ -952,14 +1089,21 @@ function sizeAmount(el){if(el)el.style.width=Math.max(1.4,(el.value||el.placehol
 function focusEl(el,select){if(!el)return;try{el.focus({preventScroll:true});}catch(e){el.focus();}if(select&&el.select)el.select();}
 
 function txRow(t,withDate){
+  const open='<button class="tx-row" data-a="tx-edit" data-id="'+esc(t.id)+'">',d=withDate?dayShort(t.date):'';
+  const row=(icon,color,title,sub,amtHtml,cls)=>open+'<span class="ic" style="--c:'+color+'">'+esc(icon)+'</span>'+
+    '<span class="tx-main"><span class="tx-title">'+esc(title)+'</span>'+(sub?'<span class="tx-sub">'+esc(sub)+'</span>':'')+'</span>'+
+    '<span class="tx-amt '+(cls||'')+'">'+amtHtml+'</span></button>';
+  if(t.type==='transfer'){
+    const path=acctName(t.fromId)+' ← '+acctName(t.toId);
+    return row('⇄','#7C8580',t.note||path,[t.note?path:'',d].filter(Boolean).join(', '),money(t.amount,{dec:true}),'xfer');
+  }
+  if(t.type==='adjust'){
+    return row('⚖️','#7C8580',t.note||'התאמת יתרה',[acctName(t.accountId),d].filter(Boolean).join(', '),money(t.delta,{sign:true,dec:true}),'xfer');
+  }
   const c=catView(t.categoryId);
   const cname=(c.id==='_none'&&t.catName)?t.catName:c.name;
-  const title=t.note||cname;
-  const sub=[t.note?cname:'',withDate?dayShort(t.date):''].filter(Boolean).join(', ');
-  const signed=t.type==='income'?t.amount:-t.amount;
-  return '<button class="tx-row" data-a="tx-edit" data-id="'+esc(t.id)+'"><span class="ic" style="--c:'+c.color+'">'+esc(c.icon)+'</span>'+
-    '<span class="tx-main"><span class="tx-title">'+esc(title)+'</span>'+(sub?'<span class="tx-sub">'+esc(sub)+'</span>':'')+'</span>'+
-    '<span class="tx-amt '+(t.type==='income'?'pos':'')+'">'+money(signed,{sign:true,dec:true})+'</span></button>';
+  const sub=[t.note?cname:'',t.accountId?acctName(t.accountId):'',d].filter(Boolean).join(', ');
+  return row(c.icon,c.color,t.note||cname,sub,money(flowSigned(t),{sign:true,dec:true}),t.type==='income'?'pos':'');
 }
 function barRow(id,sum,total,action,extra){
   const c=catView(id),p=pct(sum,total);
@@ -968,9 +1112,11 @@ function barRow(id,sum,total,action,extra){
     '<span class="track"><i style="width:'+Math.max(p,1)+'%;background:'+c.color+'"></i></span></button>';
 }
 function nwRow(x,kind,c){
-  const stale=x.updatedAt&&(Date.now()-x.updatedAt)/864e5>35;
+  const live=acctGroup(kind,x.category)==='live';
+  const stale=!live&&x.updatedAt&&(Date.now()-x.updatedAt)/864e5>35;
+  const sub=live?c.name+' · מתעדכן מהתנועות':(stale?'לא עודכן מעל חודש, ':'')+'עודכן '+relDay(x.updatedAt);
   return '<button class="tx-row" data-a="'+kind+'-edit" data-id="'+esc(x.id)+'"><span class="ic" style="--c:'+c.color+'">'+c.icon+'</span>'+
-    '<span class="tx-main"><span class="tx-title">'+esc(x.name)+'</span><span class="tx-sub'+(stale?' stale':'')+'">'+(stale?'לא עודכן מעל חודש, ':'')+'עודכן '+relDay(x.updatedAt)+'</span></span>'+
+    '<span class="tx-main"><span class="tx-title">'+esc(x.name)+'</span><span class="tx-sub'+(stale?' stale':'')+'">'+esc(sub)+'</span></span>'+
     '<span class="tx-amt'+(kind==='liab'?' neg':'')+'">'+money(kind==='liab'?-x.value:x.value)+'</span></button>';
 }
 function rangeSeg(){
@@ -1063,6 +1209,9 @@ function matchQ(t,q){
     const n=+num,hit=num.includes('.')?r2(t.amount)===r2(n):Math.floor(t.amount)===n;
     return hit||note.includes(q);
   }
+  const accts=[t.accountId,t.fromId,t.toId].filter(Boolean).map(id=>acctName(id).toLowerCase());
+  if(accts.some(n=>n.includes(q)))return true;
+  if(!isFlow(t))return note.includes(q)||(t.type==='transfer'?'העברה':'התאמת יתרה').includes(q);
   return note.includes(q)||catView(catKey(t)).name.toLowerCase().includes(q)||(t.catName||'').toLowerCase().includes(q);
 }
 function viewHome(){
@@ -1073,6 +1222,8 @@ function viewHome(){
   let hint;
   if(!monthTx.length)hint='<p class="hint">עוד אין תנועות החודש. לחיצה על ＋ מוסיפה את הראשונה.</p>';
   else{const sr=saveRate(inc,exp);hint=sr.rate===null?'<p class="hint">'+sr.text+'</p>':'<p class="save-rate">'+sr.html+'</p>';}
+  const inv=investedOf(monthTx);
+  if(inv)hint+='<p class="hint">'+(inv>0?'הושקע החודש: <b>'+money(inv)+'</b>':'נמשך מהחיסכון החודש: <b>'+money(-inv)+'</b>')+'</p>';
 
   let h='<section class="flow" data-a="go" data-v="tx" role="button" aria-label="פתיחת תנועות החודש">'+
     '<h2 class="h">תזרים '+esc(F.monthOnly.format(now))+'</h2>'+
@@ -1094,7 +1245,7 @@ function viewHome(){
     h+='<div class="sec-h"><h3>לאן הלך הכסף החודש</h3><button class="link" data-a="go" data-v="tx">כל התנועות</button></div>'+
       '<div class="surface">'+top.map(id=>barRow(id,sums[id],exp,'go',' data-v="tx" data-cat="'+esc(id)+'"')).join('')+'</div>';
   }
-  const recent=S.tx.transactions.slice().sort(sortTx).slice(0,5);
+  const recent=S.tx.transactions.filter(txVisible).sort(sortTx).slice(0,5);
   h+='<div class="sec-h"><h3>תנועות אחרונות</h3></div>';
   h+=recent.length
     ?'<div class="surface list">'+recent.map(x=>txRow(x,true)).join('')+'</div>'
@@ -1103,15 +1254,15 @@ function viewHome(){
 }
 
 function txMonthData(){
-  const mk=S.month,monthTx=S.tx.transactions.filter(t=>t.date.slice(0,7)===mk);
-  const typed=S.txType==='all'?monthTx:monthTx.filter(t=>t.type===S.txType);
+  const mk=S.month,monthTx=S.tx.transactions.filter(t=>t.date.slice(0,7)===mk&&txVisible(t));
+  const typed=S.txType==='all'?monthTx:S.txType==='transfer'?monthTx.filter(t=>!isFlow(t)):monthTx.filter(t=>t.type===S.txType);
   const list=(S.txCat?typed.filter(t=>catKey(t)===S.txCat):typed).filter(t=>matchQ(t,S.txQ)).sort(sortTx);
   return{mk,monthTx,typed,list,tot:sumTx(monthTx)};
 }
 function viewTx(){
   const {mk,monthTx,typed,tot}=txMonthData(),cur=monthKey(new Date());
   const sums={};
-  for(const t of typed){const k=catKey(t);sums[k]=(sums[k]||0)+t.amount;}
+  for(const t of typed)if(isFlow(t)){const k=catKey(t);sums[k]=(sums[k]||0)+t.amount;}
   const ids=Object.keys(sums).sort((a,b)=>sums[b]-sums[a]);
   if(S.txCat&&!ids.includes(S.txCat))ids.unshift(S.txCat);
 
@@ -1126,7 +1277,7 @@ function viewTx(){
   h+='<div class="search"><input class="input" id="tx-search" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" '+
     'placeholder="חיפוש בהערה, קטגוריה או סכום" aria-label="חיפוש תנועות בחודש" value="'+esc(S.txQ)+'">'+
     '<button class="search-x" data-a="tx-q-clear" aria-label="ניקוי החיפוש"'+(S.txQ?'':' hidden')+'>✕</button></div>';
-  h+='<div class="seg">'+[['all','הכל',''],['expense','הוצאות','exp'],['income','הכנסות','inc']].map(([v,l,c])=>
+  h+='<div class="seg">'+[['all','הכל',''],['expense','הוצאות','exp'],['income','הכנסות','inc'],['transfer','העברות','']].map(([v,l,c])=>
     '<button data-a="tx-type" data-v="'+v+'" class="'+(S.txType===v?'on '+c:'')+'">'+l+'</button>').join('')+'</div>';
 
   if(ids.length){
@@ -1145,7 +1296,7 @@ function txResults(){
   }
 
   const btype=S.txType==='income'?'income':'expense';
-  if(!S.txCat&&!q){
+  if(!S.txCat&&!q&&S.txType!=='transfer'){
     const bs={};
     for(const t of monthTx)if(t.type===btype){const k=catKey(t);bs[k]=(bs[k]||0)+t.amount;}
     const bids=Object.keys(bs).sort((a,b)=>bs[b]-bs[a]);
@@ -1168,7 +1319,7 @@ function txResults(){
     for(const t of list){
       let g=groups[groups.length-1];
       if(!g||g.date!==t.date){g={date:t.date,items:[],net:0};groups.push(g);}
-      g.items.push(t);g.net+=t.type==='income'?t.amount:-t.amount;
+      g.items.push(t);g.net+=flowSigned(t);
     }
     h+=groups.map(g=>'<div class="day-h"><span>'+esc(dayLabel(g.date))+'</span>'+money(r2(g.net),{sign:true,dec:true})+'</div>'+
       '<div class="surface list">'+g.items.map(t=>txRow(t,false)).join('')+'</div>').join('');
@@ -1187,25 +1338,39 @@ function viewNw(){
     '<div class="nw-split"><div><span>נכסים</span><b>'+money(t.a)+'</b></div><div><span>התחייבויות</span><b>'+money(t.l)+'</b></div></div></section>';
   h+='<div class="sec-h"><h3>מגמה</h3>'+rangeSeg()+'</div><div class="surface"><div class="chart" data-chart="nw" data-h="200" style="margin-top:4px"></div></div>';
 
-  h+='<div class="sec-h"><h3>נכסים</h3><button class="link" data-a="asset-add">＋ הוספת נכס</button></div>';
-  if(!S.nw.assets.length){
-    h+='<div class="surface empty">אפשר להתחיל מקופת גמל, קרן השתלמות או חשבון העו"ש.<br><button class="btn primary" data-a="asset-add">הוספת נכס</button></div>';
+  // כסף שוטף: עו"ש, מזומן/ארנק וכרטיסי אשראי. היתרה מתעדכנת מהתנועות
+  const liveA=S.nw.assets.filter(x=>acctGroup('asset',x.category)==='live'),liveL=S.nw.liabilities.filter(x=>acctGroup('liab',x.category)==='live');
+  const liveSum=r2(liveA.reduce((s,x)=>s+x.value,0)-liveL.reduce((s,x)=>s+x.value,0));
+  h+='<div class="sec-h"><h3>כסף שוטף</h3><button class="link" data-a="asset-add" data-v="checking">＋ הוספה</button></div>';
+  h+=liveA.length+liveL.length
+    ?'<div class="surface list">'+liveA.map(x=>nwRow(x,'asset',ASSET_CATS.find(c=>c.id===x.category))).join('')+
+      liveL.map(x=>nwRow(x,'liab',LIAB_CATS.find(c=>c.id===x.category))).join('')+
+      '<div class="grp-h" style="padding-top:10px"><span>סה"כ</span>'+money(liveSum)+'</div></div>'
+    :'<div class="surface empty">עו"ש, מזומן, ביט או כרטיס אשראי. היתרה שלהם תתעדכן לבד מההוצאות וההכנסות.<br><button class="btn primary" data-a="asset-add" data-v="checking">הוספת חשבון</button></div>';
+
+  // חיסכון והשקעות
+  const saveA=S.nw.assets.filter(x=>acctGroup('asset',x.category)==='save'),saveSum=r2(saveA.reduce((s,x)=>s+x.value,0));
+  h+='<div class="sec-h"><h3>חיסכון והשקעות</h3><button class="link" data-a="asset-add" data-v="deposit">＋ הוספה</button></div>';
+  if(!saveA.length){
+    h+='<div class="surface empty">קופת גמל, קרן השתלמות, פנסיה, תיק מסחר או פיקדון.<br><button class="btn primary" data-a="asset-add" data-v="deposit">הוספה</button></div>';
   }else{
     const groups=ASSET_CATS.map(c=>{
-      const items=S.nw.assets.filter(x=>x.category===c.id).sort((a,b)=>b.value-a.value);
+      const items=saveA.filter(x=>x.category===c.id).sort((a,b)=>b.value-a.value);
       return{c,items,sum:r2(items.reduce((s,x)=>s+x.value,0))};
     }).filter(g=>g.items.length);
     const pos=groups.filter(g=>g.sum>0);
-    const stack=t.a>0?'<div class="stack">'+pos.map(g=>'<i style="flex-grow:'+g.sum+';background:'+g.c.color+'"></i>').join('')+'</div>'+
-      '<div class="legend">'+pos.map(g=>'<span><i style="background:'+g.c.color+'"></i>'+esc(g.c.name)+' <span class="num">'+pct(g.sum,t.a)+'%</span></span>').join('')+'</div>':'';
+    const stack=saveSum>0&&groups.length>1?'<div class="stack">'+pos.map(g=>'<i style="flex-grow:'+g.sum+';background:'+g.c.color+'"></i>').join('')+'</div>'+
+      '<div class="legend">'+pos.map(g=>'<span><i style="background:'+g.c.color+'"></i>'+esc(g.c.name)+' <span class="num">'+pct(g.sum,saveSum)+'%</span></span>').join('')+'</div>':'';
     h+='<div class="surface" style="padding-top:14px;padding-bottom:4px">'+stack+groups.map(g=>
       '<div class="grp-h"><span>'+g.c.icon+' '+esc(g.c.name)+'</span>'+money(g.sum)+'</div>'+g.items.map(x=>nwRow(x,'asset',g.c)).join('')).join('')+'</div>';
   }
 
-  h+='<div class="sec-h"><h3>התחייבויות</h3><button class="link" data-a="liab-add">＋ הוספת התחייבות</button></div>';
-  h+=S.nw.liabilities.length
-    ?'<div class="surface list">'+S.nw.liabilities.slice().sort((a,b)=>b.value-a.value).map(x=>nwRow(x,'liab',LIAB_CATS.find(c=>c.id===x.category)||LIAB_CATS[3])).join('')+'</div>'
-    :'<div class="surface empty">אין התחייבויות רשומות.</div>';
+  // חובות
+  const debtL=S.nw.liabilities.filter(x=>acctGroup('liab',x.category)==='debt');
+  h+='<div class="sec-h"><h3>חובות</h3><button class="link" data-a="liab-add">＋ הוספה</button></div>';
+  h+=debtL.length
+    ?'<div class="surface list">'+debtL.slice().sort((a,b)=>b.value-a.value).map(x=>nwRow(x,'liab',LIAB_CATS.find(c=>c.id===x.category)||LIAB_CATS[3])).join('')+'</div>'
+    :'<div class="surface empty">אין חובות רשומים.</div>';
 
   const hist=S.nw.history;
   if(hist.length){
@@ -1276,34 +1441,81 @@ function render(){
 function openTxSheet(id){
   const t=id?S.tx.transactions.find(x=>x.id===id):null;
   if(id&&!t)return;
+  if(t&&t.type==='adjust'){openAdjustSheet(t);return;}
   const f=S.form={kind:'tx',id:t?t.id:null,type:t?t.type:'expense',
-    categoryId:t&&S.tx.categories.some(c=>c.id===t.categoryId)?t.categoryId:null,date:t?t.date:todayStr()};
+    categoryId:t&&S.tx.categories.some(c=>c.id===t.categoryId)?t.categoryId:null,date:t?t.date:todayStr(),
+    accountId:t?(t.accountId||null):lastAcct('expense'),fromId:t?(t.fromId||null):lastAcct('expense'),toId:t&&t.toId||null};
   const html=sheetHead(t?'עריכת תנועה':'הוספה מהירה')+
-    '<div class="seg" id="f-type"><button data-a="f-type" data-v="expense">הוצאה</button><button data-a="f-type" data-v="income">הכנסה</button></div>'+
+    '<div class="seg" id="f-type"><button data-a="f-type" data-v="expense">הוצאה</button><button data-a="f-type" data-v="income">הכנסה</button><button data-a="f-type" data-v="transfer">העברה</button></div>'+
     '<label class="amount-wrap" id="f-amount-wrap"><span class="cur">₪</span><input id="f-amount" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" aria-label="סכום" value="'+(t?t.amount:'')+'"></label>'+
-    '<div class="field-label">קטגוריה</div><div class="chips wrap" id="f-cats"></div>'+
-    '<div class="newcat" id="f-newcat" hidden><input id="f-newcat-icon" class="input emoji-in" maxlength="8" value="🏷️" aria-label="אייקון"><input id="f-newcat-name" class="input grow" placeholder="שם הקטגוריה" enterkeyhint="done"><button class="btn primary" style="padding:12px 16px" data-a="f-newcat-save">הוספה</button></div>'+
+    '<div class="field-label">תיאור</div><input id="f-note" class="input" placeholder="למשל: קפה עם דני" enterkeyhint="done" autocomplete="off" value="'+esc(t?t.note:'')+'">'+
+    '<div id="f-cat-sec"><div class="field-label">קטגוריה</div><div class="chips block" id="f-cats"></div>'+
+    '<div class="newcat" id="f-newcat" hidden><input id="f-newcat-icon" class="input emoji-in" maxlength="8" value="🏷️" aria-label="אייקון"><input id="f-newcat-name" class="input grow" placeholder="שם הקטגוריה" enterkeyhint="done"><button class="btn primary" style="padding:12px 16px" data-a="f-newcat-save">הוספה</button></div></div>'+
+    '<div id="f-acct-sec"><div class="field-label" id="f-acct-label">מאיזה חשבון</div><div class="chips line" id="f-accts"></div></div>'+
+    '<div id="f-xfer-sec"><div class="field-label">מחשבון</div><div class="chips line" id="f-from"></div><div class="field-label">לחשבון</div><div class="chips line" id="f-to"></div></div>'+
     '<div class="field-label">תאריך</div><div class="date-row"><div class="chips" id="f-datechips"><button class="chip" data-a="f-date" data-v="t">היום</button><button class="chip" data-a="f-date" data-v="y">אתמול</button></div><input type="date" id="f-date" class="input" value="'+f.date+'"></div>'+
-    '<div class="field-label">הערה</div><input id="f-note" class="input" placeholder="לא חובה" enterkeyhint="done" value="'+esc(t?t.note:'')+'">'+
     '<div class="sheet-actions">'+(t?'<button class="btn ghost danger" data-a="tx-del">מחיקה</button>':'')+'<button class="btn primary grow" data-a="tx-save" data-primary>'+(t?'שמירת שינויים':'שמירה')+'</button></div>';
   openSheet(html);
-  syncTxType();renderCatChips();syncDateChips();
+  syncTxType();syncDateChips();
   const amt=$('#f-amount');sizeAmount(amt);
   if(!t)focusEl(amt);
 }
+/* רשומת התאמת יתרה: רק צפייה ומחיקה (מחיקה מחזירה את היתרה לקודמת) */
+function openAdjustSheet(t){
+  S.form={kind:'tx',id:t.id,type:'adjust'};
+  openSheet(sheetHead('התאמת יתרה')+
+    '<p style="margin:4px 0 6px"><b>'+esc(acctName(t.accountId))+'</b>: היתרה עודכנה ל־'+money(t.value,{dec:true})+' ('+money(t.delta,{sign:true,dec:true})+')</p>'+
+    '<p class="muted small">'+esc(dayLabel(t.date))+(t.note?' · '+esc(t.note):'')+'. מחיקה מחזירה את היתרה למה שהייתה לפני ההתאמה.</p>'+
+    '<div class="sheet-actions"><button class="btn ghost danger" data-a="tx-del">מחיקה</button><button class="btn primary grow" data-a="sheet-close">סגירה</button></div>');
+}
+/* בשורה שנגללת לצדדים: מוודאים שהבחירה המסומנת נראית (רק גלילה אופקית, בלי להזיז את החלון) */
+function scrollToOn(box){
+  const on=box&&box.querySelector('.chip.on');if(!on||!box.getBoundingClientRect)return;
+  requestAnimationFrame(()=>{
+    const b=box.getBoundingClientRect(),c=on.getBoundingClientRect(),pad=18;
+    if(!b.width)return;
+    if(c.left<b.left+pad)box.scrollLeft+=c.left-b.left-pad;
+    else if(c.right>b.right-pad)box.scrollLeft+=c.right-b.right+pad;
+  });
+}
+const acctChip=(a,on,act)=>'<button class="chip '+(on?'on':'')+'" style="--c:'+acctCat(a).color+'" data-a="'+act+'" data-id="'+esc(a.x.id)+'">'+esc(acctCat(a).icon)+' '+esc(a.x.name)+'</button>';
+function renderAcctChips(){
+  const f=S.form;if(!f)return;
+  const sec=$('#f-acct-sec'),box=$('#f-accts');if(!sec||!box)return;
+  const live=liveAccts();
+  sec.hidden=f.type==='transfer'||!live.length;
+  $('#f-acct-label').textContent=f.type==='income'?'לאיזה חשבון':'מאיזה חשבון';
+  box.innerHTML='<button class="chip '+(!f.accountId?'on':'')+'" data-a="f-acct" data-id="">בלי חשבון</button>'+live.map(a=>acctChip(a,f.accountId===a.x.id,'f-acct')).join('');
+  scrollToOn(box);
+}
+function renderXferChips(){
+  const f=S.form;if(!f)return;
+  const all=allAccts();
+  const none='<span class="muted small" style="align-self:center">צריך לפחות שני חשבונות. מוסיפים אותם במסך השווי הנקי.</span>';
+  $('#f-from').innerHTML=all.length<2?none:all.map(a=>acctChip(a,f.fromId===a.x.id,'f-from')).join('');
+  $('#f-to').innerHTML=all.length<2?'':all.filter(a=>a.x.id!==f.fromId).map(a=>acctChip(a,f.toId===a.x.id,'f-to')).join('');
+  scrollToOn($('#f-from'));scrollToOn($('#f-to'));
+}
 function syncTxType(){
-  const v=S.form.type;
-  $$('#f-type button').forEach(b=>{b.className=b.dataset.v===v?'on '+(v==='expense'?'exp':'inc'):'';});
-  const w=$('#f-amount-wrap');if(w)w.className='amount-wrap '+(v==='expense'?'exp':'inc');
+  const v=S.form.type,cls=v==='expense'?'exp':v==='income'?'inc':'xfer';
+  $$('#f-type button').forEach(b=>{b.className=b.dataset.v===v?'on '+cls:'';});
+  const w=$('#f-amount-wrap');if(w)w.className='amount-wrap '+cls;
+  $('#f-cat-sec').hidden=v==='transfer';$('#f-xfer-sec').hidden=v!=='transfer';
+  if(v==='transfer')renderXferChips();else renderCatChips();
+  renderAcctChips();
 }
 function renderCatChips(){
   const f=S.form,box=$('#f-cats');if(!box||!f)return;
   const counts=usageCounts();
-  const cats=S.tx.categories.map((c,i)=>({c,i})).filter(o=>o.c.type===f.type)
+  const all=S.tx.categories.map((c,i)=>({c,i})).filter(o=>o.c.type===f.type)
     .sort((a,b)=>(counts[b.c.id]||0)-(counts[a.c.id]||0)||a.i-b.i).map(o=>o.c);
-  box.innerHTML=(cats.length?'':'<span class="muted small" style="align-self:center">עוד אין קטגוריות מסוג זה.</span>')+
+  // כל הקטגוריות, הנפוצות ראשונות, בגוש של עד 3 שורות שנגלל לצדדים
+  const cats=all,n=cats.length+1;
+  box.style.setProperty('--rows',n>8?3:n>3?2:1);
+  box.innerHTML=(all.length?'':'<span class="muted small" style="align-self:center">עוד אין קטגוריות מסוג זה.</span>')+
     cats.map(c=>'<button class="chip '+(f.categoryId===c.id?'on':'')+'" style="--c:'+c.color+'" data-a="f-cat" data-id="'+esc(c.id)+'">'+esc(c.icon)+' '+esc(c.name)+'</button>').join('')+
     '<button class="chip add" data-a="f-newcat">＋ חדשה</button>';
+  scrollToOn(box);
 }
 function syncDateChips(){
   const d=S.form.date;
@@ -1323,59 +1535,84 @@ function saveTx(){
   const f=S.form;if(!f)return;
   const amount=parseAmount($('#f-amount').value);
   if(!(amount>0)){toast('צריך סכום גדול מאפס');focusEl($('#f-amount'));return;}
-  if(!f.categoryId){toast('צריך לבחור קטגוריה');return;}
+  const xfer=f.type==='transfer';
+  if(xfer){
+    if(!f.fromId||!f.toId){toast('צריך לבחור מאיזה חשבון ולאיזה');return;}
+    if(f.fromId===f.toId){toast('צריך שני חשבונות שונים');return;}
+  }else if(!f.categoryId){toast('צריך לבחור קטגוריה');return;}
   const date=/^\d{4}-\d{2}-\d{2}$/.test($('#f-date').value)?$('#f-date').value:todayStr();
   const note=$('#f-note').value.trim();
-  const catName=catView(f.categoryId).name;
   const mk=date.slice(0,7),active=wantedMonths().has(mk);
-  let t,prev=null;
+  const fields=xfer
+    ?{type:'transfer',amount,categoryId:null,catName:'',date,note,fromId:f.fromId,toId:f.toId}
+    :Object.assign({type:f.type,amount,categoryId:f.categoryId,catName:catView(f.categoryId).name,date,note},f.accountId&&acctOf(f.accountId)?{accountId:f.accountId}:{});
+  let prev=null,t;
   if(f.id){
-    t=S.tx.transactions.find(x=>x.id===f.id);
-    if(!t)return;
-    prev=Object.assign({},t);
-    Object.assign(t,{type:f.type,amount,categoryId:f.categoryId,catName,date,note});
+    const i=S.tx.transactions.findIndex(x=>x.id===f.id);if(i<0)return;
+    prev=Object.assign({},S.tx.transactions[i]);
+    t=Object.assign({id:prev.id,createdAt:prev.createdAt},fields);
+    S.tx.transactions[i]=t;
   }else{
-    t={id:uid(),type:f.type,amount,categoryId:f.categoryId,catName,date,note,createdAt:Date.now()};
+    t=Object.assign({id:uid(),createdAt:Date.now()},fields);
     if(active)S.tx.transactions.push(t);
   }
+  if(!xfer)setLastAcct(f.type,f.accountId);
   const edited=!!f.id,tid=t.id;
-  D.putTx(t);closeSheet();render();
+  saveTxFx(t,prev);closeSheet();render();
   const undo=edited
-    ?()=>{   // מחזירים את הגרסה הקודמת של התנועה
-      const cur=S.tx.transactions.find(x=>x.id===tid);
-      if(cur)Object.assign(cur,prev);else if(wantedMonths().has(prev.date.slice(0,7)))S.tx.transactions.push(Object.assign({},prev));
-      D.putTx(Object.assign({},prev));render();toast('השינויים בוטלו');
+    ?()=>{   // מחזירים את הגרסה הקודמת (גם את היתרות)
+      const i=S.tx.transactions.findIndex(x=>x.id===tid),cur=i>=0?S.tx.transactions[i]:t;
+      if(i>=0)S.tx.transactions[i]=Object.assign({},prev);else if(wantedMonths().has(prev.date.slice(0,7)))S.tx.transactions.push(Object.assign({},prev));
+      saveTxFx(Object.assign({},prev),cur);render();toast('השינויים בוטלו');
     }
-    :()=>{   // ההוספה בוטלה: מוחקים את התנועה החדשה
+    :()=>{   // ההוספה בוטלה: מוחקים את התנועה ומחזירים את היתרות
       S.tx.transactions=S.tx.transactions.filter(x=>x.id!==tid);
-      D.delTx(tid);render();toast('ההוספה בוטלה');
+      delTxFx(t);render();toast('ההוספה בוטלה');
     };
-  toast(!active?'נשמר ב'+monthName(mk):edited?'השינויים נשמרו':(f.type==='income'?'ההכנסה נשמרה':'ההוצאה נשמרה'),'',undo);
+  toast(!active?'נשמר ב'+monthName(mk):edited?'השינויים נשמרו':xfer?'ההעברה נשמרה':(f.type==='income'?'ההכנסה נשמרה':'ההוצאה נשמרה'),'',undo);
 }
 
 /* ================= sheets: assets & liabilities ================= */
-function openNwSheet(kind,id){
+function openNwSheet(kind,id,preset){
   const list=kind==='asset'?S.nw.assets:S.nw.liabilities,cats=kind==='asset'?ASSET_CATS:LIAB_CATS;
   const x=id?list.find(i=>i.id===id):null;
   if(id&&!x)return;
-  S.form={kind:'nw',nk:kind,id:x?x.id:null,category:x?x.category:cats[0].id};
-  const title=x?(kind==='asset'?'עדכון נכס':'עדכון התחייבות'):(kind==='asset'?'נכס חדש':'התחייבות חדשה');
+  S.form={kind:'nw',nk:kind,id:x?x.id:null,category:x?x.category:(cats.some(c=>c.id===preset)?preset:cats[0].id)};
+  const title=x?'עדכון '+x.name:(kind==='asset'?'חשבון חדש':'התחייבות חדשה');
   const html=sheetHead(title)+
-    '<div class="field-label" style="margin-top:4px">'+(kind==='asset'?'שווי נוכחי':'יתרה לסילוק')+'</div>'+
+    '<div class="field-label" style="margin-top:4px" id="n-value-label"></div>'+
     '<label class="amount-wrap"><span class="cur">₪</span><input id="n-value" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" value="'+(x?x.value:'')+'"></label>'+
-    (x?'<p class="hint" style="text-align:center">עודכן '+relDay(x.updatedAt)+'. שמירה של סכום חדש מוסיפה נקודה לגרף.</p>':'')+
+    '<p class="hint" style="text-align:center" id="n-hint"></p>'+
     '<div class="field-label">סוג</div><div class="chips wrap" id="n-cats">'+cats.map(c=>
       '<button class="chip '+(c.id===S.form.category?'on':'')+'" style="--c:'+c.color+'" data-a="f-acat" data-v="'+c.id+'">'+c.icon+' '+c.name+'</button>').join('')+'</div>'+
     '<div class="field-label">שם</div><input id="n-name" class="input" enterkeyhint="done" placeholder="'+(kind==='asset'?'למשל: גמל להשקעה, מסלול מניות':'למשל: משכנתא, מסלול פריים')+'" value="'+esc(x?x.name:'')+'">'+
     '<div class="sheet-actions">'+(x?'<button class="btn ghost danger" data-a="nw-del">מחיקה</button>':'')+'<button class="btn primary grow" data-a="nw-save" data-primary>'+(x?'שמירת עדכון':'הוספה')+'</button></div>';
-  openSheet(html);
+  openSheet(html);syncNwLabels();
   const v=$('#n-value');sizeAmount(v);focusEl(v,!!x);
+}
+/* הכותרת וההסבר מעל הסכום תלויים בקבוצה של הסוג שנבחר */
+function syncNwLabels(){
+  const f=S.form;if(!f||f.kind!=='nw')return;
+  const g=acctGroup(f.nk,f.category),x=f.id?(f.nk==='asset'?S.nw.assets:S.nw.liabilities).find(i=>i.id===f.id):null;
+  $('#n-value-label').textContent=g==='live'?(f.nk==='liab'?'החוב הנוכחי בכרטיס':(x?'יתרה נוכחית':'יתרת פתיחה')):(f.nk==='asset'?'שווי נוכחי':'יתרה לסילוק');
+  $('#n-hint').textContent=g==='live'
+    ?(x?'היתרה מתעדכנת לבד מהתנועות. שינוי כאן נשמר כהתאמת יתרה ומופיע ברשימת התנועות.':'מכאן והלאה היתרה תתעדכן לבד מההוצאות, ההכנסות וההעברות.'+(f.nk==='asset'?' אפשר גם יתרה שלילית (מינוס).':''))
+    :(x?'עודכן '+relDay(x.updatedAt)+'. שמירה של סכום חדש מוסיפה נקודה לגרף.':'');
+}
+/* רשומת עדכון/התאמה לכל שינוי ידני בערך של חשבון (תשתית ליתרה היסטורית ולתשואה) */
+function adjustRec(item,oldValue,isNew,now){
+  const delta=r2(item.value-oldValue);
+  if(!delta)return null;
+  const kind=S.nw.assets.includes(item)?'asset':'liab',live=acctGroup(kind,item.category)==='live';
+  return{id:uid(),type:'adjust',amount:Math.abs(delta),categoryId:null,catName:'',date:todayStr(),
+    note:isNew?'יתרת פתיחה':live?'התאמת יתרה':'עדכון שווי',createdAt:now,accountId:item.id,delta,value:item.value};
 }
 function saveNw(){
   const f=S.form;if(!f)return;
   const list=f.nk==='asset'?S.nw.assets:S.nw.liabilities,cats=f.nk==='asset'?ASSET_CATS:LIAB_CATS;
-  const raw=$('#n-value').value,value=parseAmount(raw);
-  if(!raw.trim()||!(value>=0)){toast('צריך סכום תקין');focusEl($('#n-value'));return;}
+  const raw=$('#n-value').value,live=acctGroup(f.nk,f.category)==='live';
+  const neg=live&&f.nk==='asset'&&/^\s*[-−]/.test(raw),value=neg?-parseAmount(raw.replace(/^\s*[-−]/,'')):parseAmount(raw);
+  if(!raw.trim()||!(Math.abs(value)>=0)){toast('צריך סכום תקין');focusEl($('#n-value'));return;}
   const name=$('#n-name').value.trim()||cats.find(c=>c.id===f.category).name;
   const now=Date.now();
   let item,prev=null;
@@ -1389,14 +1626,17 @@ function saveNw(){
   }
   const pt=snapshot((f.id?'עדכון: ':'הוספה: ')+name);
   const edited=!!f.id,nk=f.nk;
-  D.putItem(nk,item,pt);closeSheet();render();
+  const rec=adjustRec(item,prev?prev.value:0,!prev,now);
+  if(rec)S.tx.transactions.push(rec);
+  D.putItem(nk,item,pt,rec);closeSheet();render();
   const iid=item.id;
   toast(edited?(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר'):(nk==='asset'?'הנכס נוסף':'ההתחייבות נוספה'),'',()=>{
     const lst=nk==='asset'?S.nw.assets:S.nw.liabilities,cur=lst.find(i=>i.id===iid);
     if(prev){if(cur)Object.assign(cur,prev);else lst.push(Object.assign({},prev));}
     else{const i=lst.indexOf(cur);if(i>=0)lst.splice(i,1);}
     if(pt)S.nw.history=S.nw.history.filter(p=>p.t!==pt.t);
-    D.revertItem(nk,iid,prev,pt&&pt.t);render();toast(prev?'העדכון בוטל':'ההוספה בוטלה');
+    if(rec)S.tx.transactions=S.tx.transactions.filter(t=>t.id!==rec.id);
+    D.revertItem(nk,iid,prev,pt&&pt.t,rec&&rec.id);render();toast(prev?'העדכון בוטל':'ההוספה בוטלה');
   });
 }
 
@@ -1472,13 +1712,16 @@ function saveBulk(){
   }
   if(!changes.length){closeSheet();return;}
   const olds=changes.map(({kind,x})=>({kind,id:x.id,value:x.value,updatedAt:x.updatedAt}));
-  const ups=changes.map(({kind,x,v})=>{x.value=v;x.updatedAt=now;return{kind,id:x.id,value:v,updatedAt:now};});
+  const recs=[];
+  const ups=changes.map(({kind,x,v})=>{const old=x.value;x.value=v;x.updatedAt=now;const r=adjustRec(x,old,false,now);if(r)recs.push(r);return{kind,id:x.id,value:v,updatedAt:now};});
+  recs.forEach(r=>S.tx.transactions.push(r));
   const pt=snapshot('עדכון מלא');
-  D.bulk(ups,pt);closeSheet();render();
+  D.bulk(ups,pt,recs);closeSheet();render();
   toast(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר','',()=>{
     for(const o of olds){const x=(o.kind==='asset'?S.nw.assets:S.nw.liabilities).find(i=>i.id===o.id);if(x){x.value=o.value;x.updatedAt=o.updatedAt;}}
     if(pt)S.nw.history=S.nw.history.filter(p=>p.t!==pt.t);
-    D.bulkRevert(olds,pt&&pt.t);render();toast('העדכון המלא בוטל');
+    const rids=new Set(recs.map(r=>r.id));S.tx.transactions=S.tx.transactions.filter(t=>!rids.has(t.id));
+    D.bulkRevert(olds,pt&&pt.t,[...rids]);render();toast('העדכון המלא בוטל');
   });
 }
 
@@ -1703,7 +1946,10 @@ document.addEventListener('click',async e=>{
     case 'range':S.range=v;render();break;
     case 'sheet-close':closeSheet();break;
 
-    case 'f-type':if(f&&f.type!==v){f.type=v;f.categoryId=null;syncTxType();renderCatChips();}break;
+    case 'f-type':if(f&&f.type!==v){f.type=v;f.categoryId=null;if(!f.id&&v!=='transfer')f.accountId=lastAcct(v);syncTxType();}break;
+    case 'f-acct':if(f){f.accountId=id||null;renderAcctChips();}break;
+    case 'f-from':if(f){f.fromId=id;if(f.toId===id)f.toId=null;renderXferChips();}break;
+    case 'f-to':if(f){f.toId=id;renderXferChips();}break;
     case 'f-cat':if(f){f.categoryId=id;renderCatChips();}break;
     case 'f-newcat':{const box=$('#f-newcat');box.hidden=!box.hidden;if(!box.hidden)focusEl($('#f-newcat-name'));break;}
     case 'f-newcat-save':addInlineCat();break;
@@ -1714,20 +1960,20 @@ document.addEventListener('click',async e=>{
       const old=S.tx.transactions.find(t=>t.id===f.id);if(!old)break;
       const copy=Object.assign({},old);
       S.tx.transactions=S.tx.transactions.filter(t=>t.id!==f.id);
-      D.delTx(f.id);closeSheet();render();
-      toast('התנועה נמחקה','',()=>{
+      delTxFx(copy);closeSheet();render();
+      toast(copy.type==='adjust'?'ההתאמה נמחקה':'התנועה נמחקה','',()=>{
         if(wantedMonths().has(copy.date.slice(0,7))&&!S.tx.transactions.some(t=>t.id===copy.id))S.tx.transactions.push(copy);
-        D.putTx(copy);render();toast('התנועה הוחזרה');
+        saveTxFx(copy,null);render();toast(copy.type==='adjust'?'ההתאמה הוחזרה':'התנועה הוחזרה');
       });
       break;
     }
     case 'undo':runUndo();break;
 
-    case 'asset-add':openNwSheet('asset');break;
+    case 'asset-add':openNwSheet('asset',null,v);break;
     case 'liab-add':openNwSheet('liab');break;
     case 'asset-edit':openNwSheet('asset',id);break;
     case 'liab-edit':openNwSheet('liab',id);break;
-    case 'f-acat':if(f){f.category=v;$$('#n-cats .chip').forEach(c=>c.classList.toggle('on',c.dataset.v===v));}break;
+    case 'f-acat':if(f){f.category=v;$$('#n-cats .chip').forEach(c=>c.classList.toggle('on',c.dataset.v===v));syncNwLabels();}break;
     case 'nw-save':saveNw();break;
     case 'nw-bulk':openBulkSheet();break;
     case 'bulk-save':saveBulk();break;
