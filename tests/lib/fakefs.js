@@ -1,9 +1,13 @@
 // In-memory Firestore that enforces the security-rules limit: a batch may use at most 20 access calls,
 // and every write in our rules costs one exists() call on the allowlist.
 const clone=v=>JSON.parse(JSON.stringify(v));
-function makeShared(){return{store:new Map(),listeners:new Set(),log:[]};}
+function makeShared(){return{store:new Map(),listeners:new Set(),log:[],ver:new Map()};}
 function makeFake(sh,user){
   const {store,listeners,log}=sh;
+  const ver=sh.ver||(sh.ver=new Map());
+  // כל כתיבה מעלה גרסה למסמך, כדי שעסקה תזהה שמסמך שקראה השתנה (כמו ב-Firestore)
+  const _set=store.set.bind(store),_del=store.delete.bind(store);
+  if(!store.__wrapped){store.set=(k,v)=>{ver.set(k,(ver.get(k)||0)+1);return _set(k,v);};store.delete=k=>{ver.set(k,(ver.get(k)||0)+1);return _del(k);};store.__wrapped=true;}
   const parentOf=k=>k.slice(0,k.lastIndexOf('/'));
   const run=q=>{let d=[...store.entries()].filter(([k])=>parentOf(k)===q.path).map(([k,v])=>({id:k.slice(k.lastIndexOf('/')+1),data:v}));
     for(const c of q.cons||[])if(c.t==='where')d=d.filter(x=>{const v=x.data[c.f];return c.op==='>='?v>=c.v:c.op==='<'?v<c.v:c.op==='=='?v===c.v:true;});
@@ -15,7 +19,7 @@ function makeFake(sh,user){
   const emit=l=>l.cb(l.t.kind==='doc'?ds(l.t):qs(run(l.t)));
   const notify=()=>{for(const l of listeners)setTimeout(()=>l.on&&emit(l),0);};
   // update() עם increment: {value:{__inc:5}} מוסיף 5 לערך הקיים
-  const applyUpd=(cur,d)=>{const o=Object.assign({},cur);for(const [k,v] of Object.entries(d))o[k]=v&&typeof v==='object'&&'__inc' in v?Math.round(((+o[k]||0)+v.__inc)*100)/100:clone(v);return o;};
+  const applyUpd=(cur,d)=>{const o=Object.assign({},cur);for(const [k,v] of Object.entries(d)){if(v&&typeof v==='object'&&v.__del){delete o[k];continue;}o[k]=v&&typeof v==='object'&&'__inc' in v?Math.round(((+o[k]||0)+v.__inc)*100)/100:clone(v);}return o;};
   const denied=()=>Object.assign(new Error('Missing or insufficient permissions.'),{code:'permission-denied'});
   const fs={
     collection:(db,...p)=>({kind:'col',path:p.join('/')}),doc:(db,...p)=>({kind:'doc',path:p.join('/'),id:p[p.length-1]}),
@@ -27,7 +31,24 @@ function makeFake(sh,user){
         for(const [t,r] of ops)if(t==='update'&&!store.has(r.path))throw Object.assign(new Error('No document to update'),{code:'not-found'});   // כמו Firestore: הכול או כלום
         for(const [t,r,d] of ops){if(t==='set')store.set(r.path,clone(d));else if(t==='update')store.set(r.path,applyUpd(store.get(r.path),d));else store.delete(r.path);}notify();}};},
     async getDocsFromServer(q){return qs(run(q));},async getCountFromServer(q){return{data:()=>({count:run(q).length})};},
-    async waitForPendingWrites(){},increment:n=>({__inc:n}),
+    async waitForPendingWrites(){},increment:n=>({__inc:n}),deleteField:()=>({__del:true}),
+    async updateDoc(r,d){if(!store.has(r.path))throw Object.assign(new Error('No document to update'),{code:'not-found'});store.set(r.path,applyUpd(store.get(r.path),d));notify();},
+    // עסקה: קוראים, ואז כל הכתיבות יחד (הכול או כלום). log: ['tx', מספר כתיבות]
+    async runTransaction(db,fn){
+      for(let attempt=0;attempt<5;attempt++){
+        const ops=[],reads=new Map();
+        const tr={get:async r=>{reads.set(r.path,ver.get(r.path)||0);return ds(r);},set:(r,d)=>{ops.push(['set',r,d]);return tr;},update:(r,d)=>{ops.push(['update',r,d]);return tr;},delete:r=>{ops.push(['del',r]);return tr;}};
+        const res=await fn(tr);
+        await new Promise(r=>setTimeout(r,0));   // פער בין הקריאה לכתיבה, כמו ברשת
+        if([...reads].some(([k,v])=>(ver.get(k)||0)!==v))continue;   // מישהו שינה בינתיים: מריצים שוב
+        log.push(['tx',ops.length]);if(ops.length>20)throw denied();
+        for(const [t,r] of ops)if(t==='update'&&!store.has(r.path))throw Object.assign(new Error('No document to update'),{code:'not-found'});
+        for(const [t,r,d] of ops){if(t==='set')store.set(r.path,clone(d));else if(t==='update')store.set(r.path,applyUpd(store.get(r.path),d));else store.delete(r.path);}
+        if(ops.length)notify();
+        return res;
+      }
+      throw Object.assign(new Error('transaction failed'),{code:'aborted'});
+    },
     async disableNetwork(){log.push(['disableNetwork']);},async enableNetwork(){log.push(['enableNetwork']);}
   };
   const auth={onAuthStateChanged:(a,cb)=>{setTimeout(()=>cb(user),0);return()=>{};},signOut:async()=>{}};
