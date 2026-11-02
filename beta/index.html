@@ -499,7 +499,7 @@ function normRec(a){
     paused:!!r.paused,createdAt:num(r.createdAt)},
     r.accountId?{accountId:String(r.accountId)}:{},
     r.type==='transfer'?{fromId:String(r.fromId||''),toId:String(r.toId||'')}:{},
-    num(r.count)>1?{count:Math.round(num(r.count)),total:r2(num(r.total))}:{}));
+    num(r.count)>1?Object.assign({count:Math.round(num(r.count)),total:r2(num(r.total))},r.paid!=null&&isFinite(+r.paid)?{paid:r2(+r.paid)}:{}):{}));
 }
 function normNw(o){
   o=o||{};
@@ -529,7 +529,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.5',APP_BUILD='b2',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.5',APP_BUILD='b3',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
@@ -560,7 +560,7 @@ const SKEL='<div class="skel" style="height:150px"></div><div class="skel" style
 function markLoaded(k){
   S.loaded[k]=true;
   const first=!S.ready&&LOAD_KEYS.every(x=>S.loaded[x]);
-  if(first){S.ready=true;try{ensureMonthlyPoint();}catch(e){console.error(e);}setTimeout(genRecurring,0);}
+  if(first){S.ready=true;try{ensureMonthlyPoint();}catch(e){console.error(e);}setTimeout(async()=>{await backfillPaid();genRecurring();},0);}
   if(S.ready)render();
   if(first&&S.quick){S.quick=false;openTxSheet();}
 }
@@ -697,19 +697,19 @@ const D={
   delCat(id){this.w(this.F.deleteDoc(this.ref('categories',id)));},
   putTx(t){const {id,...r}=t;this.w(this.F.setDoc(this.ref('tx',id),r));},
   /* R3: יצירת תנועה חוזרת לחודש mk, רק אם התבנית עוד לא טופלה בחודש הזה (עסקה אטומית מול השרת) */
-  async recGenerate(recId,mk,t,fx){
+  async recGenerate(recId,mk,build){
     syncBegin();
     try{
       return await this.F.runTransaction(this.db,async tr=>{
         const ref=this.ref('recurring',recId),snap=await tr.get(ref);
-        if(!snap.exists())return false;
+        if(!snap.exists())return null;
         const d=snap.data();
-        if(d.paused||(d.lastMonth&&d.lastMonth>=mk))return false;
-        const {id,...r}=t;
+        if(d.paused||(d.lastMonth&&d.lastMonth>=mk))return null;
+        const {t,fx}=build(d),{id,...r}=t;
         tr.set(this.ref('tx',id),r);
         fx.forEach(e=>tr.update(this.ref(this.itemCol(e.kind),e.id),{value:this.F.increment(e.d)}));
-        tr.update(ref,{lastMonth:mk});
-        return true;
+        tr.update(ref,Object.assign({lastMonth:mk},t.inst&&d.paid!=null?{paid:this.F.increment(t.amount)}:{}));
+        return{t,fx};
       });
     }finally{syncEnd();}
   },
@@ -722,6 +722,10 @@ const D={
   },
   updRec(id,data){this.w(this.F.updateDoc(this.ref('recurring',id),data));},
   delRec(id){this.w(this.F.deleteDoc(this.ref('recurring',id)));},
+  async recPaidSum(id){
+    const F=this.F,snap=await F.getDocsFromServer(F.query(this.col('tx'),F.where('recId','==',id)));
+    return r2(snap.docs.reduce((s,d)=>s+(+d.data().amount||0),0));
+  },
   /* ביטול יצירה: מוחקים את התבנית ואת התנועה הראשונה, ומחזירים את היתרות */
   undoRec(id,txs,fx){
     const ops=[{ref:this.ref('recurring',id),del:true}];
@@ -730,10 +734,11 @@ const D={
     this.w(this.runOps(ops));
   },
   /* תנועה + עדכון יתרות באותה פעולה. increment מתחבר נכון גם כששני מכשירים או מצב לא מקוון כותבים במקביל */
-  txWrite(t,fx){
+  txWrite(t,fx,paidFx){
     const b=this.F.writeBatch(this.db);
     if(t.del)b.delete(this.ref('tx',t.id));else{const {id,...r}=t;b.set(this.ref('tx',id),r);}
     (fx||[]).forEach(e=>b.update(this.ref(this.itemCol(e.kind),e.id),{value:this.F.increment(e.d)}));
+    (paidFx||[]).forEach(e=>b.update(this.ref('recurring',e.id),{paid:this.F.increment(e.d)}));
     this.w(b.commit());
   },
   delTx(id){this.w(this.F.deleteDoc(this.ref('tx',id)));},
@@ -989,21 +994,42 @@ function mergeFx(list){
 const negFx=fx=>fx.map(e=>Object.assign({},e,{d:-e.d}));
 function applyFxLocal(fx){for(const e of fx){const a=acctOf(e.id);if(a)a.x.value=r2(a.x.value+e.d);}}
 /* שמירה/מחיקה של תנועה יחד עם עדכון היתרות (prev = הגרסה הקודמת בעריכה) */
-function saveTxFx(t,prev){const fx=mergeFx([...(prev?negFx(txEffects(prev)):[]),...txEffects(t)]);applyFxLocal(fx);D.txWrite(t,fx);}
-function delTxFx(t){const fx=mergeFx(negFx(txEffects(t)));applyFxLocal(fx);D.txWrite({id:t.id,del:true},fx);}
+/* תשלום שנערך/נמחק/הוחזר משנה את "שולם" בתבנית, כדי שהיתרה תתחלק מחדש על התשלומים הבאים */
+function paidFx(t,prev){
+  const m=new Map(),add=(x,s)=>{if(!x||!x.inst||!x.recId)return;m.set(x.recId,(m.get(x.recId)||0)+s*x.amount);};
+  add(t,1);add(prev,-1);
+  const out=[];
+  m.forEach((d,id)=>{const r=S.rec.find(x=>x.id===id);d=r2(d);if(r&&r.paid!=null&&d){r.paid=r2(r.paid+d);out.push({id,d});}});
+  return out;
+}
+function saveTxFx(t,prev){const fx=mergeFx([...(prev?negFx(txEffects(prev)):[]),...txEffects(t)]);applyFxLocal(fx);D.txWrite(t,fx,paidFx(t,prev));}
+function delTxFx(t){const fx=mergeFx(negFx(txEffects(t)));applyFxLocal(fx);D.txWrite({id:t.id,del:true},fx,paidFx(null,t));}
 /* ================= תנועות חוזרות ותשלומים (R3) ================= */
 const monthsDiff=(a,b)=>(+b.slice(0,4)*12+ +b.slice(5,7))-(+a.slice(0,4)*12+ +a.slice(5,7));
 function dayIn(mk,day){const last=new Date(+mk.slice(0,4),+mk.slice(5,7),0).getDate();return mk+'-'+String(Math.min(day,last)).padStart(2,'0');}
 /* תשלומים שווים; השארית (אגורות) בתשלום הראשון, כמו בחברות האשראי */
 function instAmount(r,i){const base=Math.floor(r.total/r.count*100)/100;return i===1?r2(r.total-base*(r.count-1)):base;}
+/* כמה שולם עד עכשיו: paid אם ידוע (b3), אחרת לפי החלוקה המקורית */
+function recPaid(r,upto){
+  if(r.paid!=null)return r.paid;
+  let s=0;for(let i=1;i<upto;i++)s+=instAmount(r,i);return r2(s);
+}
+/* סכום התשלום i. מה שנשאר מתחלק שווה על התשלומים שנשארו; האחרון סוגר את האגורות.
+   כך עריכה או מחיקה של תשלום מתחלקת מחדש על הבאים */
+function payAmount(r,i){
+  if(r.paid==null||i===1&&!r.paid)return instAmount(r,i);
+  const left=Math.max(0,r2(r.total-r.paid)),k=r.count-i+1;
+  if(k<=1)return left;
+  return Math.floor(left/k*100)/100;
+}
 const recNext=r=>r.lastMonth?shiftMonth(r.lastMonth,1):r.startMonth;
 const recIndex=(r,mk)=>monthsDiff(r.startMonth,mk)+1;
-const recDone=r=>!!r.count&&recIndex(r,recNext(r))>r.count;
+const recDone=r=>!!r.count&&(recIndex(r,recNext(r))>r.count||(r.paid!=null&&r.total-r.paid<0.005));
 const recLabel=r=>r.note||(r.type==='transfer'?acctName(r.fromId)+' ← '+acctName(r.toId):(catView(r.categoryId).id==='_none'?r.catName:catView(r.categoryId).name))||'תנועה חוזרת';
 /* התנועה של חודש mk. מזהה דטרמיניסטי (תבנית+חודש), כדי ששני מכשירים לא ייצרו כפילות */
 function recTx(r,mk){
   const i=r.count?recIndex(r,mk):0;
-  return Object.assign({id:'r-'+r.id+'-'+mk,type:r.type,amount:i?instAmount(r,i):r.amount,categoryId:r.categoryId,catName:r.catName,
+  return Object.assign({id:'r-'+r.id+'-'+mk,type:r.type,amount:i?payAmount(r,i):r.amount,categoryId:r.categoryId,catName:r.catName,
     date:dayIn(mk,r.day),note:r.note,createdAt:Date.now(),recId:r.id},
     r.type==='transfer'?{fromId:r.fromId,toId:r.toId}:(r.accountId?{accountId:r.accountId}:{}),
     i?{inst:{i,n:r.count}}:{});
@@ -1014,6 +1040,7 @@ function recDue(r){
   if(r.paused)return out;
   for(let m=recNext(r);m<=cur;m=shiftMonth(m,1)){
     if(r.count&&recIndex(r,m)>r.count)break;
+    if(r.count&&r.paid!=null&&r.total-r.paid<0.005)break;
     if(dayIn(m,r.day)>today)break;
     out.push(m);
   }
@@ -1022,8 +1049,7 @@ function recDue(r){
 /* כמה נשאר לשלם בתשלומים שעוד לא נוצרו */
 function recRemaining(r){
   if(!r.count)return 0;
-  let s=0;for(let i=recIndex(r,recNext(r));i<=r.count;i++)s+=instAmount(r,i);
-  return r2(s);
+  return Math.max(0,r2(r.total-recPaid(r,recIndex(r,recNext(r)))));
 }
 const committedInst=()=>r2(S.rec.reduce((s,r)=>s+recRemaining(r),0));
 /* צפוי עוד החודש: תבניות שהיום שלהן החודש עוד לא הגיע */
@@ -1032,10 +1058,17 @@ function expectedThisMonth(){
   for(const r of S.rec){
     if(r.paused||recNext(r)!==cur||dayIn(cur,r.day)<=today)continue;
     if(r.count&&recIndex(r,cur)>r.count)continue;
-    const a=r.count?instAmount(r,recIndex(r,cur)):r.amount;
+    const a=r.count?payAmount(r,recIndex(r,cur)):r.amount;
     if(r.type==='expense')o.exp+=a;else if(r.type==='income')o.inc+=a;
   }
   return{exp:r2(o.exp),inc:r2(o.inc)};
+}
+/* תבניות תשלומים מלפני b3 (בלי paid): מחשבים פעם אחת מהתשלומים שכבר נוצרו (קריאה מהשרת, רק עם חיבור) */
+async function backfillPaid(){
+  if(navigator.onLine===false)return;
+  for(const r of S.rec.filter(x=>x.count&&x.paid==null)){
+    try{const sum=await D.recPaidSum(r.id);r.paid=sum;D.updRec(r.id,{paid:sum});}catch(e){console.error(e);return;}
+  }
 }
 /* יוצרת את התנועות שהגיע זמנן. כל חודש בפעולה אטומית מול השרת (רק עם חיבור), כך ששני מכשירים לא ייצרו פעמיים */
 let recBusy=false;
@@ -1045,11 +1078,14 @@ async function genRecurring(){
   try{
     for(const r of S.rec.slice()){
       for(const m of recDue(r)){
-        const t=recTx(r,m),fx=mergeFx(txEffects(t));
-        let ok;
-        try{ok=await D.recGenerate(r.id,m,t,fx);}catch(e){console.error(e);return;}
+        // הסכום מחושב מהעותק שבשרת בתוך העסקה (paid עדכני גם אם מכשיר אחר שינה)
+        const build=d=>{const rr=normRec([Object.assign({},d,{id:r.id})])[0];const t=recTx(rr,m);return{t,fx:mergeFx(txEffects(t))};};
+        let res;
+        try{res=await D.recGenerate(r.id,m,build);}catch(e){console.error(e);return;}
         r.lastMonth=m;
-        if(!ok)continue;
+        if(!res)continue;
+        const {t,fx}=res;
+        if(r.count)r.paid=r2((r.paid!=null?r.paid:recPaid(r,recIndex(r,m)))+t.amount);
         n++;
         if(wantedMonths().has(m)&&!S.tx.transactions.some(x=>x.id===t.id))S.tx.transactions.push(t);
         applyFxLocal(fx);
@@ -1644,7 +1680,7 @@ function openTxSheet(id){
     '<div id="f-acct-sec"><div class="field-label" id="f-acct-label">מאיזה חשבון</div><div class="chips line" id="f-accts"></div></div>'+
     '<div id="f-xfer-sec"><div class="field-label">מחשבון</div><div class="chips line" id="f-from"></div><div class="field-label">לחשבון</div><div class="chips line" id="f-to"></div></div>'+
     '<div class="field-label">תאריך</div><div class="date-row"><div class="chips" id="f-datechips"><button class="chip" data-a="f-date" data-v="t">היום</button><button class="chip" data-a="f-date" data-v="y">אתמול</button></div><input type="date" id="f-date" class="input" value="'+f.date+'"></div>'+
-    (t&&t.recId?'<p class="hint">שינוי כאן חל רק על '+(t.inst?'התשלום הזה':'התנועה הזאת')+'. לשינוי '+(t.inst?'התשלומים הבאים':'החודשים הבאים')+': הגדרות ← תנועות חוזרות ותשלומים.</p>':'')+
+    (t&&t.recId?'<p class="hint">'+(t.inst?'שינוי הסכום כאן משנה את מה שנשאר: היתרה תתחלק מחדש על התשלומים הבאים.':'שינוי כאן חל רק על התנועה הזאת. לשינוי החודשים הבאים: הגדרות ← תנועות חוזרות ותשלומים.')+'</p>':'')+
     (t?'':'<div id="f-rep-sec"><div class="field-label">חזרה</div><div class="chips wrap" id="f-rep">'+
       '<button class="chip on" data-a="f-rep" data-v="once">פעם אחת</button><button class="chip" data-a="f-rep" data-v="monthly">🔁 כל חודש</button>'+
       '<button class="chip" data-a="f-rep" data-v="inst" id="f-rep-inst">בתשלומים</button></div>'+
@@ -1767,7 +1803,8 @@ function saveTx(){
   else if(f.id){
     const i=S.tx.transactions.findIndex(x=>x.id===f.id);if(i<0)return;
     prev=Object.assign({},S.tx.transactions[i]);
-    t=Object.assign({id:prev.id,createdAt:prev.createdAt},fields);
+    // שומרים את הקישור לתבנית (תנועה חוזרת / תשלום i מתוך n)
+    t=Object.assign({id:prev.id,createdAt:prev.createdAt},fields,prev.recId?{recId:prev.recId}:{},prev.inst?{inst:prev.inst}:{});
     S.tx.transactions[i]=t;
   }else{
     t=Object.assign({id:uid(),createdAt:Date.now()},fields);
@@ -1798,7 +1835,8 @@ function saveRecurringNew(f,fields,date){
   const r=Object.assign({id:uid()},base,{day:+date.slice(8),startMonth:mk,lastMonth:null,paused:false,createdAt:Date.now()},
     inst?{count:n,total:fields.amount}:{});
   if(inst)r.amount=instAmount(r,2);
-  const months=recDue(r),txs=months.map(m=>recTx(r,m));
+  if(inst)r.paid=0;
+  const months=recDue(r),txs=months.map(m=>{const t=recTx(r,m);if(inst)r.paid=r2(r.paid+t.amount);return t;});
   if(months.length)r.lastMonth=months[months.length-1];
   const fx=mergeFx([].concat(...txs.map(txEffects)));
   S.rec.push(r);

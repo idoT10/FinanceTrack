@@ -19,6 +19,7 @@ const val=(sh,p)=>sh.store.get(P_BETA+p).value;
 const tx=(sh,id)=>sh.store.get(P_BETA+'tx/'+id);
 // מחכים לתנאי (עד 3 שניות) במקום זמן קבוע: הפעלה ראשונה של jsdom איטית
 const waitFor=async(fn,ms=3000)=>{const end=Date.now()+ms;while(Date.now()<end){try{if(fn())return true;}catch(e){}await sleep(20);}return false;};
+const r2s=v=>Math.round(v*100)/100;
 const recs=sh=>keys(sh,P_BETA+'recurring/').map(k=>Object.assign({id:k.split('/').pop()},sh.store.get(k)));
 
 module.exports=async t=>{
@@ -109,7 +110,7 @@ module.exports=async t=>{
     t.ok(val(shP,'liabilities/cc')===900,'card debt = 3 × 300');
     P.tab('tx');await sleep(30);
     P.click(P.$('.tx-row[data-id="'+pids[2]+'"]'));await sleep(10);
-    t.ok(/שינוי כאן חל רק על התשלום הזה/.test(P.$('#sheet').textContent),'editing a payment: hint that the change applies to this payment only');
+    t.ok(/היתרה תתחלק מחדש על התשלומים הבאים/.test(P.$('#sheet').textContent),'editing a payment: hint that the rest is redistributed');
     P.click(P.$('[data-a="sheet-close"]'));await sleep(10);
     P.click(P.$('[data-a="fab"]'));await sleep(10);P.click(P.$('[data-a="sheet-close"]'));await sleep(10);
     // undo removes all of them
@@ -120,6 +121,48 @@ module.exports=async t=>{
     const rp2=recs(shP).find(r=>r.total===600);
     P.click(P.$('#toast .toast-undo'));await sleep(80);
     t.ok(!recs(shP).some(r=>r.total===600)&&!keys(shP,P_BETA+'tx/').some(k=>k.includes('r-'+rp2.id))&&val(shP,'liabilities/cc')===900,'undo: template, all created payments and the debt reverted');
+  }
+
+  // Ido's case (b3): 2,400 in 7 from the 1st of last month → 2 payments; payment 2 edited to 500 → the rest is redistributed
+  {
+    const shK=makeShared();seed(shK);
+    const K=openApp(shK);await sleep(200);
+    K.click(K.$('[data-a="fab"]'));await sleep(10);
+    K.type(K.$('#f-amount'),'2400');K.click(K.$('#f-cats [data-id="shop"]'));K.click(K.$('#f-accts [data-id="cc"]'));
+    K.$('#f-date').value=mkShift(-1)+'-01';K.$('#f-date').dispatchEvent(new K.w.Event('change',{bubbles:true}));
+    K.click(K.$('#f-rep [data-v="inst"]'));K.type(K.$('#f-inst'),'7');K.click(K.$('[data-a="tx-save"]'));await sleep(80);
+    const rk=recs(shK)[0],p2='r-'+rk.id+'-'+MK;
+    t.ok(tx(shK,'r-'+rk.id+'-'+mkShift(-1))&&tx(shK,p2)&&rk.paid===r2s(tx(shK,'r-'+rk.id+'-'+mkShift(-1)).amount+tx(shK,p2).amount),'2 of 7 created; template remembers what was paid ('+rk.paid+')');
+    K.tab('tx');await sleep(30);
+    K.click(K.$('.tx-row[data-id="'+p2+'"]'));await sleep(10);K.type(K.$('#f-amount'),'500');K.click(K.$('[data-a="tx-save"]'));await sleep(60);
+    const paid=shK.store.get(P_BETA+'recurring/'+rk.id).paid,first=tx(shK,'r-'+rk.id+'-'+mkShift(-1)).amount;
+    t.ok(Math.abs(paid-(first+500))<0.005,'edit payment 2 to 500: paid = '+first+' + 500');
+    t.ok(tx(shK,p2).recId===rk.id&&tx(shK,p2).inst.i===2,'edited payment keeps its link to the template (recId, "תשלום 2 מתוך 7")');
+    K.tab('settings');await sleep(30);
+    const left=(2400-first-500).toFixed(2);
+    t.ok(K.$('#view').textContent.includes(Number(left).toLocaleString('en-US',{minimumFractionDigits:2}))||K.$('#view').textContent.includes(Math.round(+left).toLocaleString('en-US')),'settings: "נשארו" = '+left+' (2,400 − what was paid)');
+    // the next payment = remaining / 5; the last one closes the cents
+    const rr=Object.assign({},shK.store.get(P_BETA+'recurring/'+rk.id));
+    const per=Math.floor((2400-rr.paid)/5*100)/100;
+    t.ok(Math.abs(per-Math.floor((2400-first-500)/5*100)/100)<0.005&&per<342,'next payments are redistributed: '+per+' each (was ~342.85)');
+    // delete payment 2 → its amount goes back to "left"
+    K.tab('tx');await sleep(30);K.click(K.$('.tx-row[data-id="'+p2+'"]'));await sleep(10);K.click(K.$('[data-a="tx-del"]'));await sleep(60);
+    t.ok(Math.abs(shK.store.get(P_BETA+'recurring/'+rk.id).paid-first)<0.005,'delete a payment: paid goes down, the rest is spread on the next payments');
+    K.click(K.$('#toast .toast-undo'));await sleep(60);
+    t.ok(Math.abs(shK.store.get(P_BETA+'recurring/'+rk.id).paid-(first+500))<0.005,'undo delete: paid back');
+  }
+  // generation uses the redistributed amount; last payment closes the cents; old templates get "paid" from their payments
+  {
+    const shL=makeShared();seed(shL);
+    // old template (no paid), started 6 months ago, 7 payments of 2,400; one payment already created with 500
+    shL.store.set(P_BETA+'recurring/old',{type:'expense',amount:342.85,total:2400,count:7,categoryId:'shop',catName:'קניות',note:'',accountId:'cc',day:1,startMonth:mkShift(-6),lastMonth:mkShift(-6),paused:false,createdAt:1});
+    shL.store.set(P_BETA+'tx/r-old-'+mkShift(-6),{type:'expense',amount:500,categoryId:'shop',catName:'קניות',date:mkShift(-6)+'-01',note:'',createdAt:1,recId:'old',inst:{i:1,n:7},accountId:'cc'});
+    openApp(shL);
+    await waitFor(()=>shL.store.get(P_BETA+'recurring/old').lastMonth===MK);
+    const amts=[-5,-4,-3,-2,-1,0].map(k=>tx(shL,'r-old-'+mkShift(k)).amount);
+    const sum=r2s(500+amts.reduce((a,b)=>a+b,0));
+    t.ok(amts[0]===Math.floor(1900/6*100)/100,'old template: "paid" taken from its payments (500), next = 1,900 / 6 = '+amts[0]);
+    t.ok(sum===2400&&shL.store.get(P_BETA+'recurring/old').paid===2400,'all 7 payments add up to exactly 2,400 (the last closes the cents)');
   }
 
   // installments started 4 months ago with 3 payments → stops after the 3rd
