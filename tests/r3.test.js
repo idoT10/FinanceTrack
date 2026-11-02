@@ -17,6 +17,8 @@ function seed(sh){
 }
 const val=(sh,p)=>sh.store.get(P_BETA+p).value;
 const tx=(sh,id)=>sh.store.get(P_BETA+'tx/'+id);
+// מחכים לתנאי (עד 3 שניות) במקום זמן קבוע: הפעלה ראשונה של jsdom איטית
+const waitFor=async(fn,ms=3000)=>{const end=Date.now()+ms;while(Date.now()<end){try{if(fn())return true;}catch(e){}await sleep(20);}return false;};
 const recs=sh=>keys(sh,P_BETA+'recurring/').map(k=>Object.assign({id:k.split('/').pop()},sh.store.get(k)));
 
 module.exports=async t=>{
@@ -28,7 +30,8 @@ module.exports=async t=>{
   if(tomorrow)sh.store.set(P_BETA+'recurring/sal',{type:'income',amount:12000,categoryId:'sal',catName:'משכורת',note:'',accountId:'c1',day:tomorrow,startMonth:MK,lastMonth:null,paused:false,createdAt:1});
   // paused template → nothing
   sh.store.set(P_BETA+'recurring/gym',{type:'expense',amount:200,categoryId:'shop',catName:'קניות',note:'חדר כושר',day:1,startMonth:mkShift(-1),lastMonth:null,paused:true,createdAt:1});
-  const A=openApp(sh);await sleep(300);
+  const A=openApp(sh);
+  await waitFor(()=>sh.store.get(P_BETA+'recurring/rent').lastMonth===MK&&/נוספו/.test(A.toast()));
   const {$,$$,click}=A;
   const rentIds=[-3,-2,-1,0].map(k=>'r-rent-'+mkShift(k));
   t.ok(rentIds.every(id=>tx(sh,id)),'catch-up: one transaction per month, deterministic ids (r-<template>-<month>)');
@@ -43,12 +46,13 @@ module.exports=async t=>{
   }
   // ---- second device opening: no duplicates ----
   const before=keys(sh,P_BETA+'tx/').length,bal=val(sh,'assets/c1');
-  const B=openApp(sh);await sleep(300);
+  const B=openApp(sh);await waitFor(()=>B.$('#view')&&B.$('#view').children.length>0);await sleep(200);
   t.ok(keys(sh,P_BETA+'tx/').length===before&&val(sh,'assets/c1')===bal,'second device: no duplicates, balance unchanged');
   // two devices racing on a stale template: the transaction re-reads it, only one wins
   await A.fake.fs.setDoc({path:P_BETA+'recurring/race'},{type:'expense',amount:10,categoryId:'shop',catName:'קניות',note:'',accountId:'c1',day:1,startMonth:MK,lastMonth:null,paused:false,createdAt:1});
   await sleep(50);   // both apps now know the template; both try to create this month's transaction at the same moment
-  A.w.document.dispatchEvent(new A.w.Event('visibilitychange'));B.w.document.dispatchEvent(new B.w.Event('visibilitychange'));await sleep(300);
+  A.w.document.dispatchEvent(new A.w.Event('visibilitychange'));B.w.document.dispatchEvent(new B.w.Event('visibilitychange'));
+  await waitFor(()=>tx(sh,'r-race-'+MK));await sleep(200);
   t.ok(tx(sh,'r-race-'+MK)&&val(sh,'assets/c1')===bal-10,'two devices at once: created once, balance −10 once');
 
   // ---- generated transaction: edit/delete only that one, not re-created ----
@@ -88,10 +92,40 @@ module.exports=async t=>{
   C.tab('settings');await sleep(30);
   t.ok(/נשארו ₪?666\.66|נשארו ₪?667/.test(C.$('#view').textContent)&&!/<\/?span|&lt;/.test(C.$('#view').textContent),'settings: "נשארו" amount shown as text, no raw HTML');
 
+  // installments with a start date 2 months ago, from the add sheet: all due payments created at once, message says where
+  if(now.getDate()<=28){
+    const shP=makeShared();seed(shP);
+    const P=openApp(shP);await sleep(200);
+    const start=mkShift(-2)+'-'+pad(now.getDate());
+    P.click(P.$('[data-a="fab"]'));await sleep(10);
+    P.type(P.$('#f-amount'),'900');P.click(P.$('#f-cats [data-id="shop"]'));P.click(P.$('#f-accts [data-id="cc"]'));
+    P.$('#f-date').value=start;P.$('#f-date').dispatchEvent(new P.w.Event('change',{bubbles:true}));
+    P.click(P.$('#f-rep [data-v="inst"]'));P.type(P.$('#f-inst'),'3');
+    P.click(P.$('[data-a="tx-save"]'));await sleep(80);
+    const rp=recs(shP)[0];
+    const pids=[-2,-1,0].map(k=>'r-'+rp.id+'-'+mkShift(k));
+    t.ok(pids.every(id=>tx(shP,id))&&tx(shP,pids[0]).date===start&&rp.lastMonth===MK,'past start: all 3 due payments created at once (also works offline)');
+    t.ok(/הראשון ב/.test(P.toast())&&/נוצרו 3/.test(P.toast()),'message says where the first payment is ('+P.toast()+')');
+    t.ok(val(shP,'liabilities/cc')===900,'card debt = 3 × 300');
+    P.tab('tx');await sleep(30);
+    P.click(P.$('.tx-row[data-id="'+pids[2]+'"]'));await sleep(10);
+    t.ok(/שינוי כאן חל רק על התשלום הזה/.test(P.$('#sheet').textContent),'editing a payment: hint that the change applies to this payment only');
+    P.click(P.$('[data-a="sheet-close"]'));await sleep(10);
+    P.click(P.$('[data-a="fab"]'));await sleep(10);P.click(P.$('[data-a="sheet-close"]'));await sleep(10);
+    // undo removes all of them
+    P.click(P.$('[data-a="fab"]'));await sleep(10);
+    P.type(P.$('#f-amount'),'600');P.click(P.$('#f-cats [data-id="shop"]'));P.click(P.$('#f-accts [data-id="cc"]'));
+    P.$('#f-date').value=start;P.$('#f-date').dispatchEvent(new P.w.Event('change',{bubbles:true}));
+    P.click(P.$('#f-rep [data-v="inst"]'));P.type(P.$('#f-inst'),'2');P.click(P.$('[data-a="tx-save"]'));await sleep(80);
+    const rp2=recs(shP).find(r=>r.total===600);
+    P.click(P.$('#toast .toast-undo'));await sleep(80);
+    t.ok(!recs(shP).some(r=>r.total===600)&&!keys(shP,P_BETA+'tx/').some(k=>k.includes('r-'+rp2.id))&&val(shP,'liabilities/cc')===900,'undo: template, all created payments and the debt reverted');
+  }
+
   // installments started 4 months ago with 3 payments → stops after the 3rd
   const sh3=makeShared();seed(sh3);
   sh3.store.set(P_BETA+'recurring/tv',{type:'expense',amount:333.33,total:1000,count:3,categoryId:'shop',catName:'קניות',note:'טלוויזיה',accountId:'cc',day:1,startMonth:mkShift(-4),lastMonth:null,paused:false,createdAt:1});
-  const E=openApp(sh3);await sleep(300);
+  const E=openApp(sh3);await waitFor(()=>keys(sh3,P_BETA+'tx/').filter(k=>k.includes('r-tv-')).length>=3);await sleep(100);
   const tv=keys(sh3,P_BETA+'tx/').filter(k=>k.includes('r-tv-'));
   t.ok(tv.length===3&&!tx(sh3,'r-tv-'+mkShift(-1)),'installments stop after the last payment (3 of 3)');
   t.ok(Math.round(val(sh3,'liabilities/cc')*100)===100000,'card debt = full 1,000 after 3 payments');
@@ -102,7 +136,7 @@ module.exports=async t=>{
   // ---- day 31 in a short month ----
   const sh4=makeShared();seed(sh4);
   sh4.store.set(P_BETA+'recurring/eom',{type:'expense',amount:1,categoryId:'shop',catName:'קניות',note:'',day:31,startMonth:mkShift(-3),lastMonth:null,paused:false,createdAt:1});
-  openApp(sh4);await sleep(300);
+  openApp(sh4);await waitFor(()=>keys(sh4,P_BETA+'tx/').filter(k=>k.includes('r-eom-')).length>=3);
   const eom=keys(sh4,P_BETA+'tx/').filter(k=>k.includes('r-eom-')).map(k=>sh4.store.get(k).date);
   t.ok(eom.length>=3&&eom.every(d=>+d.slice(8)===Math.min(31,lastDay(d.slice(0,7)))),'day 31 → last day of short months ('+eom.join(', ')+')');
 
