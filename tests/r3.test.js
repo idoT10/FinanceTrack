@@ -90,7 +90,7 @@ module.exports=async t=>{
   t.ok(/מחויב לחודשים הבאים מתשלומים:\s*₪?666\.66|666\.66/.test(C.$('#view').textContent)||/667/.test(C.$('#view').textContent),'net worth screen: committed future payments (666.66), not counted');
   C.tab('tx');await sleep(30);
   t.ok(/תשלום 1 מתוך 3/.test(C.$('.tx-row[data-id="r-'+ri.id+'-'+MK+'"]').textContent),'row shows "תשלום 1 מתוך 3"');
-  C.tab('settings');await sleep(30);
+  C.tab('settings');C.set('rec');await sleep(30);
   t.ok(/נשארו ₪?666\.66|נשארו ₪?667/.test(C.$('#view').textContent)&&!/<\/?span|&lt;/.test(C.$('#view').textContent),'settings: "נשארו" amount shown as text, no raw HTML');
 
   // installments with a start date 2 months ago, from the add sheet: all due payments created at once, message says where
@@ -138,7 +138,7 @@ module.exports=async t=>{
     const paid=shK.store.get(P_BETA+'recurring/'+rk.id).paid,first=tx(shK,'r-'+rk.id+'-'+mkShift(-1)).amount;
     t.ok(Math.abs(paid-(first+500))<0.005,'edit payment 2 to 500: paid = '+first+' + 500');
     t.ok(tx(shK,p2).recId===rk.id&&tx(shK,p2).inst.i===2,'edited payment keeps its link to the template (recId, "תשלום 2 מתוך 7")');
-    K.tab('settings');await sleep(30);
+    K.tab('settings');K.set('rec');await sleep(30);
     const left=(2400-first-500).toFixed(2);
     t.ok(K.$('#view').textContent.includes(Number(left).toLocaleString('en-US',{minimumFractionDigits:2}))||K.$('#view').textContent.includes(Math.round(+left).toLocaleString('en-US')),'settings: "נשארו" = '+left+' (2,400 − what was paid)');
     // the next payment = remaining / 5; the last one closes the cents
@@ -172,7 +172,7 @@ module.exports=async t=>{
   const tv=keys(sh3,P_BETA+'tx/').filter(k=>k.includes('r-tv-'));
   t.ok(tv.length===3&&!tx(sh3,'r-tv-'+mkShift(-1)),'installments stop after the last payment (3 of 3)');
   t.ok(Math.round(val(sh3,'liabilities/cc')*100)===100000,'card debt = full 1,000 after 3 payments');
-  E.tab('settings');await sleep(30);
+  E.tab('settings');E.set('rec');await sleep(30);
   t.ok(/הסתיים/.test(E.$('#view').textContent),'settings: finished installments marked "הסתיים"');
   t.ok(!/<\/?span|&lt;/.test(E.$('#view').textContent),'settings: no raw HTML in the status lines');
 
@@ -184,8 +184,8 @@ module.exports=async t=>{
   t.ok(eom.length>=3&&eom.every(d=>+d.slice(8)===Math.min(31,lastDay(d.slice(0,7)))),'day 31 → last day of short months ('+eom.join(', ')+')');
 
   // ---- settings: edit / pause / delete ----
-  A.tab('settings');await sleep(30);
-  t.ok(/תנועות חוזרות ותשלומים/.test(A.$('#view').textContent)&&A.$('[data-a="rec-edit"][data-id="rent"]'),'settings lists the templates');
+  A.tab('settings');A.set('rec');await sleep(30);
+  t.ok(A.$('#top-title').textContent==='תנועות חוזרות'&&A.$('[data-a="rec-edit"][data-id="rent"]'),'settings lists the templates');
   t.ok(!/<\/?span|&lt;/.test(A.$('#view').textContent),'settings: status lines are plain text (no raw HTML)');
   click($('[data-a="rec-edit"][data-id="rent"]'));await sleep(10);
   A.type($('#r-amount'),'4200');A.type($('#r-day'),'5');click($('[data-a="rec-save"]'));await sleep(40);

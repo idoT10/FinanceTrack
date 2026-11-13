@@ -8,7 +8,7 @@ module.exports=async t=>{
   for(let i=0;i<3;i++){sh.store.set('users/u1/assets/a'+i,{name:'a'+i,category:'cash',value:1000,updatedAt:1});sh.store.set('users/u1/history/'+(100+i),{t:100+i,a:3000,l:0,n:3000,note:''});}
   const prodTx=keys(sh,'users/u1/tx/').length;
   const B=openApp(sh);await sleep(150);
-  B.tab('settings');B.click(B.$('[data-a="beta-copy"]'));await B.confirm();await sleep(200);
+  B.tab('settings');B.set('beta');B.click(B.$('[data-a=\"beta-copy\"]'));await B.confirm();await sleep(200);
   t.ok(/הועתקו 28/.test(B.toast()),'copy: all 28 production documents copied ('+B.toast()+')');
   t.ok(keys(sh,P_BETA+'tx/').length===12&&keys(sh,P_BETA+'assets/').length===3,'copy: transactions and assets present in beta');
   t.ok(maxBatch(sh)<=10,'every batch ≤10 writes (largest: '+maxBatch(sh)+')');
@@ -17,7 +17,7 @@ module.exports=async t=>{
   t.ok(keys(sh,P_BETA+'assets/').map(k=>sh.store.get(k).value).includes(2000),'bulk update saved');
   B.tab('settings');B.click(B.$('[data-a="reset"]'));await B.confirm();await sleep(200);
   t.ok(keys(sh,P_BETA+'tx/').length===0&&keys(sh,'users/u1/tx/').length===prodTx,'reset in beta clears beta only');
-  B.click(B.$('[data-a="beta-wipe"]'));await B.confirm();await sleep(200);
+  B.set('beta');B.click(B.$('[data-a=\"beta-wipe\"]'));await B.confirm();await sleep(200);
   t.ok(keys(sh,P_BETA+'assets/').length===0&&keys(sh,P_BETA+'categories/').length===8,'wipe clears beta and re-seeds default categories');
   // a write that never gets acknowledged
   let release;const wb=B.fake.fs.writeBatch;B.fake.fs.writeBatch=(...a)=>{const b=wb(...a);b.commit=()=>new Promise(r=>{release=r;});return b;};   // שמירת תנועה = batch (תנועה + יתרות)

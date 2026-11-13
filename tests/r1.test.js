@@ -100,13 +100,13 @@ module.exports=async t=>{
 
   // ---- undo: category delete ----
   A.tab('settings');await sleep(30);
-  A.click(A.$('[data-a="cat-edit"][data-id="food"]'));await sleep(60);A.click(A.$('[data-a="cat-del"]'));await sleep(40);
+  A.set('cats');A.click(A.$('[data-a=\"cat-edit\"][data-id=\"food\"]'));await sleep(60);A.click(A.$('[data-a="cat-del"]'));await sleep(40);
   t.ok(!sh.store.has(P_BETA+'categories/food'),'category deleted');
   A.click(undoBtn(A));await sleep(40);
   t.ok(sh.store.get(P_BETA+'categories/food').name==='אוכל','undo: category back with the same id (transactions linked again)');
 
   // ---- heavy actions still ask ----
-  A.click(A.$('[data-a="reset"]'));await sleep(20);
+  A.tab('settings');A.click(A.$('[data-a=\"reset\"]'));await sleep(20);
   t.ok(A.$('#dialog').classList.contains('open'),'"delete all data" still asks for confirmation');
   A.click(A.$('#dialog [data-r="0"]'));await sleep(20);
 
@@ -125,24 +125,24 @@ module.exports=async t=>{
   const shares=[];
   const sh2=makeShared();seedData(sh2);
   const B=openApp(sh2,{beforeParse(w){w.navigator.canShare=()=>true;w.navigator.share=d=>{shares.push(d);return Promise.resolve();};}});
-  await sleep(150);B.tab('settings');B.click(B.$$('[data-a="bk"]')[0]);await sleep(150);B.click(B.$('[data-a="bk-save"]'));await sleep(20);
+  await sleep(150);B.tab('settings');B.set('bk');B.click(B.$$('[data-a=\"bk\"]')[0]);await sleep(150);B.click(B.$('[data-a="bk-save"]'));await sleep(20);
   t.ok(shares.length===1&&Object.keys(shares[0]).join()==='files','share gets only the file, no title/text');
 
   // ---- export: busy message stays; offline → immediate message ----
   let rel;B.fake.fs.getDocsFromServer=()=>new Promise(r=>{rel=r;});
-  B.click(B.$$('[data-a="bk"]')[0]);await sleep(2600);
+  B.set('bk');B.click(B.$$('[data-a=\"bk\"]')[0]);await sleep(2600);
   t.ok(/מכין גיבוי/.test(B.toast())&&B.$('#toast').classList.contains('show'),'export: "מכין גיבוי…" stays visible while waiting');
   rel({docs:[],metadata:{fromCache:false}});await sleep(60);
   t.ok(B.sheetOpen()&&!B.$('#toast').classList.contains('show'),'export ready: sheet opens, busy message gone');
   B.click(B.$('[data-a="sheet-close"]')||B.$('#overlay'));await sleep(20);
   Object.defineProperty(B.w.navigator,'onLine',{value:false,configurable:true});
-  B.click(B.$$('[data-a="bk"]')[0]);await sleep(20);
+  B.set('bk');B.click(B.$$('[data-a=\"bk\"]')[0]);await sleep(20);
   t.ok(/דורש חיבור לאינטרנט/.test(B.toast()),'export offline: message right away');
   Object.defineProperty(B.w.navigator,'onLine',{value:true,configurable:true});
 
   // ---- beta error code in the message ----
   B.fake.fs.getDocsFromServer=async()=>{throw Object.assign(new Error('x'),{code:'unavailable'});};
-  B.click(B.$('[data-a="beta-wipe"]'));await B.confirm();await sleep(50);
+  B.set('beta');B.click(B.$('[data-a=\"beta-wipe\"]'));await B.confirm();await sleep(50);
   t.ok(/הניקוי נכשל.*\(unavailable\)/.test(B.toast()),'beta: failure message shows the error code ('+B.toast()+')');
 
 };

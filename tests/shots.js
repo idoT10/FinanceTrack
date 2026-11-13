@@ -43,6 +43,10 @@ async function main(){
     }
     await p.click('.tab[data-v="home"]');await p.click('[data-a="fab"]');await p.waitForTimeout(450);await shot('add');
     await p.click('[data-a="sheet-close"]');await p.click('.tab[data-v="nw"]');await p.click('[data-a="nw-bulk"]');await p.waitForTimeout(450);await shot('bulk');
+    await p.click('[data-a="sheet-close"]');await p.click('[data-a="asset-edit"]');await p.waitForTimeout(450);await shot('account');
+    await p.click('[data-a="sheet-close"]');await p.click('.tab[data-v="settings"]');
+    for(const v of ['rec','cats']){await p.click('[data-a="set"][data-v="'+v+'"]');await p.waitForTimeout(300);await shot('settings-'+v,true);await p.click('[data-a="set-back"]');}
+    await p.click('[data-a="set"][data-v="theme"]');await p.waitForTimeout(450);await shot('settings-theme');
     await p.close();
   }
   await browser.close();

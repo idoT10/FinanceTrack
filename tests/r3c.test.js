@@ -28,9 +28,11 @@ module.exports=async t=>{
   t.ok(/₪10$/.test($('.tx-row[data-id="tb"] .tx-amt').textContent),'a whole amount has no decimals');
 
   // ---- breakdown: top 3, the rest on demand ----
-  t.ok($$('#tx-results .bar-row').length===3&&/הצגת כל 5/.test($('[data-a="brk-toggle"]').textContent),'breakdown shows the top 3 of 5 categories');
+  t.ok(!$$('#tx-results .bar-row').length&&$$('.brk-mini .stack i').length===5&&/ועוד 2/.test($('.brk-mini').textContent),'breakdown is collapsed: one colour bar, top 3 names');
+  click($('.brk-mini'));
+  t.ok($$('#tx-results .bar-row').length===5,'tapping it opens the full breakdown');
   click($('[data-a="brk-toggle"]'));
-  t.ok($$('#tx-results .bar-row').length===5,'"show all" opens the full breakdown');
+  t.ok(!$$('#tx-results .bar-row').length,'…and "הסתרה" closes it');
 
   // ---- net worth rows ----
   A.tab('nw');await sleep(30);
@@ -51,6 +53,19 @@ module.exports=async t=>{
   click($('[data-a="nw-bulk"]'));await sleep(10);
   A.type(bulkIn('g1'),'-5');click($('[data-a="bulk-save"]'));await sleep(40);
   t.ok(A.sheetOpen()&&/לא תקין/.test(A.toast()),'minus is still refused for a savings account');
+  click($('[data-a="sheet-close"]'));
+  // the iPhone number pad has no minus key: a button toggles the sign
+  click($('[data-a="nw-bulk"]'));await sleep(10);
+  t.ok($('[data-a="b-neg"][data-id="c1"]')&&!$('[data-a="b-neg"][data-id="g1"]'),'± button only next to current accounts');
+  click($('[data-a="b-neg"][data-id="c1"]'));
+  t.ok(bulkIn('c1').value==='300','± toggles the sign in the full update');
+  click($('[data-a="b-neg"][data-id="c1"]'));click($('[data-a="sheet-close"]'));
+  click($('[data-a="asset-edit"][data-id="c1"]'));await sleep(10);
+  t.ok(!$('#n-neg-wrap').hidden&&$('#n-neg').classList.contains('on'),'account sheet: "במינוס" button, on for a negative balance');
+  click($('#n-neg'));t.ok($('#n-value').value==='300','…and it toggles the sign');
+  click($('[data-a="sheet-close"]'));
+  click($('[data-a="asset-edit"][data-id="g1"]'));await sleep(10);
+  t.ok($('#n-neg-wrap').hidden,'no minus button for a savings account');
   click($('[data-a="sheet-close"]'));
 
   // ---- an untouched field does not overwrite a change made elsewhere meanwhile ----
@@ -77,5 +92,15 @@ module.exports=async t=>{
   t.ok(order()[0]==='e','the most used category (remembered on the device) comes first');
   A.type($('#f-amount'),'5');click($('#f-cats [data-id="b"]'));click($('[data-a="tx-save"]'));await sleep(60);
   t.ok(JSON.parse(A.w.localStorage.getItem('fin-cat-use-beta')).b===1,'saving a transaction counts its category');
+  // ---- settings menu ----
+  click($('[data-a="sheet-close"]'));A.tab('settings');await sleep(20);
+  t.ok($$('#view [data-a="set"]').length===7&&!$('#view [data-a="cat-edit"]'),'settings is a menu of rows');
+  A.set('cats');await sleep(20);
+  t.ok($('#view [data-a="cat-edit"]')&&$('[data-a="set-back"]'),'categories open as a page with a way back');
+  click($('[data-a="set-back"]'));await sleep(20);
+  A.set('acct');await sleep(20);
+  t.ok(A.sheetOpen()&&$('#sheet [data-a="signout"]'),'account opens as a sheet');
+  click($('[data-a="sheet-close"]'));
+  t.ok(!/גרסה חדשה/.test($('#view').textContent),'no "new version" notice by default');
   t.ok(!A.errors.length,'no script errors'+(A.errors.length?': '+A.errors[0]:''));
 };
