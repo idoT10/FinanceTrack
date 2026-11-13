@@ -365,11 +365,11 @@ const F={
   short:new Intl.DateTimeFormat('he-IL',{day:'numeric',month:'short',year:'2-digit'}),
   dt:new Intl.DateTimeFormat('he-IL',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
   n0:new Intl.NumberFormat('en-US',{maximumFractionDigits:0}),
-  n2:new Intl.NumberFormat('en-US',{minimumFractionDigits:0,maximumFractionDigits:2})
+  n2:new Intl.NumberFormat('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
 };
 function money(n,o){
   o=o||{};
-  const s=(o.dec?F.n2:F.n0).format(Math.abs(n));
+  const a=Math.abs(n),s=(o.dec&&!Number.isInteger(r2(a))?F.n2:F.n0).format(a);   // אגורות: או בלי, או שתי ספרות (364.70, לא 364.7)
   const pre=s==='0'?'':(n<0?'−':(o.sign&&n>0?'+':''));
   return '<span class="num">'+pre+'<span class="cs">₪</span>'+s+'</span>';
 }
@@ -389,13 +389,21 @@ function relDay(ts){
   if(s===todayStr())return'היום';
   if(s===yesterdayStr())return'אתמול';
   const days=Math.max(2,Math.floor((Date.now()-ts)/864e5));
-  if(days<45)return'לפני '+days+' ימים';
+  if(days<60)return'לפני '+days+' ימים';
+  const m=Math.round(days/30);
+  if(m<12)return m===2?'לפני חודשיים':'לפני '+m+' חודשים';
   return'ב־'+F.short.format(new Date(ts));
 }
 function parseAmount(v){
   const s=String(v||'').replace(/[,\s₪]/g,'');
   if(!/^(\d+\.?\d*|\.\d+)$/.test(s))return NaN;
   return r2(parseFloat(s));
+}
+/* סכום שיכול להיות שלילי (עו"ש במינוס). neg=false: כמו parseAmount */
+function parseSigned(v,neg){
+  const m=/^\s*[-−]/.test(String(v||''));
+  if(!m)return parseAmount(v);
+  return neg?-parseAmount(String(v).replace(/^\s*[-−]/,'')):NaN;
 }
 function firstGlyph(s){
   s=String(s||'').trim();
@@ -465,7 +473,7 @@ const S={
   nw:{assets:[],liabilities:[],history:[]},
   rec:[],
   view:'home',month:monthKey(new Date()),txType:'all',txCat:null,txQ:'',range:'all',
-  catTab:'expense',histOpen:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
+  catTab:'expense',histOpen:false,brkOpen:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
 };
 
 /* ================= storage ================= */
@@ -529,7 +537,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.5',APP_BUILD='b3',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.6',APP_BUILD='b1',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
@@ -743,9 +751,11 @@ const D={
   },
   delTx(id){this.w(this.F.deleteDoc(this.ref('tx',id)));},
   itemCol(kind){return kind==='asset'?'assets':'liabilities';},
-  putItem(kind,x,pt,rec){
+  /* delta===undefined: פריט חדש (set). אחרת עריכה: הערך משתנה בהפרש (increment), כדי לא לדרוס תנועה שנכתבה במקביל ממכשיר אחר */
+  putItem(kind,x,pt,rec,delta){
     const b=this.F.writeBatch(this.db),{id,...r}=x;
-    b.set(this.ref(this.itemCol(kind),id),r);
+    if(delta===undefined)b.set(this.ref(this.itemCol(kind),id),r);
+    else b.update(this.ref(this.itemCol(kind),id),Object.assign({name:x.name,category:x.category,updatedAt:x.updatedAt},delta?{value:this.F.increment(delta)}:{}));
     if(pt)b.set(this.ref('history',String(pt.t)),pt);
     if(rec){const {id:rid,...rr}=rec;b.set(this.ref('tx',rid),rr);}
     this.w(b.commit());
@@ -760,21 +770,23 @@ const D={
   putHist(p){this.w(this.F.setDoc(this.ref('history',String(p.t)),p));},
   /* ביטול פעולה על נכס/התחייבות: prev=הגרסה הקודמת (או null אם הפריט נוסף עכשיו ולכן נמחק),
      ptT=הנקודה שנוספה לגרף בפעולה ועכשיו נמחקת */
-  revertItem(kind,id,prev,ptT,recId){
+  revertItem(kind,id,prev,ptT,recId,delta){
     const b=this.F.writeBatch(this.db);
-    if(prev){const {id:_,...r}=prev;b.set(this.ref(this.itemCol(kind),id),r);}else b.delete(this.ref(this.itemCol(kind),id));
+    if(prev&&delta!==undefined)b.update(this.ref(this.itemCol(kind),id),Object.assign({name:prev.name,category:prev.category,updatedAt:prev.updatedAt},delta?{value:this.F.increment(-delta)}:{}));
+    else if(prev){const {id:_,...r}=prev;b.set(this.ref(this.itemCol(kind),id),r);}else b.delete(this.ref(this.itemCol(kind),id));
     if(ptT)b.delete(this.ref('history',String(ptT)));
     if(recId)b.delete(this.ref('tx',recId));
     this.w(b.commit());
   },
+  /* ups: {kind,id,d,updatedAt}. d = ההפרש בערך (0 = רק סימון "עודכן"). לא כותבים ערך מוחלט, כדי לא לדרוס שינוי מקביל */
   bulk(ups,pt,recs){
-    const ops=ups.map(u=>({ref:this.ref(this.itemCol(u.kind),u.id),update:true,data:{value:u.value,updatedAt:u.updatedAt}}));
+    const ops=ups.map(u=>({ref:this.ref(this.itemCol(u.kind),u.id),update:true,data:Object.assign({updatedAt:u.updatedAt},u.d?{value:this.F.increment(u.d)}:{})}));
     if(pt)ops.push({ref:this.ref('history',String(pt.t)),data:pt});
     (recs||[]).forEach(r=>{const {id,...d}=r;ops.push({ref:this.ref('tx',id),data:d});});
     this.w(this.runOps(ops));
   },
   bulkRevert(ups,ptT,recIds){
-    const ops=ups.map(u=>({ref:this.ref(this.itemCol(u.kind),u.id),update:true,data:{value:u.value,updatedAt:u.updatedAt}}));
+    const ops=ups.map(u=>({ref:this.ref(this.itemCol(u.kind),u.id),update:true,data:Object.assign({updatedAt:u.updatedAt},u.d?{value:this.F.increment(-u.d)}:{})}));
     if(ptT)ops.push({ref:this.ref('history',String(ptT)),del:true});
     (recIds||[]).forEach(id=>ops.push({ref:this.ref('tx',id),del:true}));
     this.w(this.runOps(ops));
@@ -1156,7 +1168,17 @@ function rangePoints(){
   if(idx===-1)return[h[h.length-1]];
   return h.slice(Math.max(0,idx-1));
 }
-function usageCounts(){const m={};for(const t of S.tx.transactions)m[t.categoryId]=(m[t.categoryId]||0)+1;return m;}
+/* כמה פעמים נבחרה כל קטגוריה: נשמר לכל מכשיר, כדי שהסדר בחלון ההוספה לא יתאפס בתחילת כל חודש.
+   התנועות שנטענו (החודש הנוכחי) משמשות רצפה, למכשיר חדש */
+const CAT_USE_KEY='fin-cat-use-'+ENV;
+function catUse(){try{const o=JSON.parse(localStorage.getItem(CAT_USE_KEY)||'{}');return o&&typeof o==='object'?o:{};}catch(e){return{};}}
+function bumpCatUse(id){if(!id)return;try{const o=catUse();o[id]=(+o[id]||0)+1;localStorage.setItem(CAT_USE_KEY,JSON.stringify(o));}catch(e){}}
+function usageCounts(){
+  const m={},st=catUse();
+  for(const t of S.tx.transactions)m[t.categoryId]=(m[t.categoryId]||0)+1;
+  for(const k in st)m[k]=Math.max(m[k]||0,+st[k]||0);
+  return m;
+}
 
 /* ================= UI bits ================= */
 let toastTimer,undoFn=null;
@@ -1270,10 +1292,11 @@ function barRow(id,sum,total,action,extra){
     '<span class="grow">'+esc(c.name)+'</span><span class="pc num">'+p+'%</span><b>'+money(sum)+'</b></span>'+
     '<span class="track"><i style="width:'+Math.max(p,1)+'%;background:'+c.color+'"></i></span></button>';
 }
-function nwRow(x,kind,c){
+/* withCat: שם הסוג בשורה עצמה (כשאין מעליה כותרת של הסוג). פריט שלא עודכן מעל חודש: אותו טקסט, בצבע אזהרה */
+function nwRow(x,kind,c,withCat){
   const live=acctGroup(kind,x.category)==='live';
   const stale=!live&&x.updatedAt&&(Date.now()-x.updatedAt)/864e5>35;
-  const sub=live?c.name+' · מתעדכן מהתנועות':(stale?'לא עודכן מעל חודש, ':'')+'עודכן '+relDay(x.updatedAt);
+  const sub=live?c.name:'עודכן '+relDay(x.updatedAt)+(withCat?' · '+c.name:'');
   return '<button class="tx-row" data-a="'+kind+'-edit" data-id="'+esc(x.id)+'"><span class="ic" style="--c:'+c.color+'">'+c.icon+'</span>'+
     '<span class="tx-main"><span class="tx-title">'+esc(x.name)+'</span><span class="tx-sub'+(stale?' stale':'')+'">'+esc(sub)+'</span></span>'+
     '<span class="tx-amt'+(kind==='liab'?' neg':'')+'">'+money(kind==='liab'?-x.value:x.value)+'</span></button>';
@@ -1463,7 +1486,8 @@ function txResults(){
     const bids=Object.keys(bs).sort((a,b)=>bs[b]-bs[a]);
     if(bids.length>1){
       h+='<div class="sec-h"><h3>'+(btype==='income'?'פילוח הכנסות':'פילוח הוצאות')+'</h3></div><div class="surface">'+
-        bids.map(id=>barRow(id,bs[id],btype==='income'?tot.inc:tot.exp,'tx-cat')).join('')+'</div>';
+        (S.brkOpen?bids:bids.slice(0,3)).map(id=>barRow(id,bs[id],btype==='income'?tot.inc:tot.exp,'tx-cat')).join('')+
+        (bids.length>3?'<button class="add-row" data-a="brk-toggle">'+(S.brkOpen?'הצגת פחות':'הצגת כל '+bids.length+' הקטגוריות')+'</button>':'')+'</div>';
     }
   }
 
@@ -1503,6 +1527,7 @@ function viewNw(){
   const liveA=S.nw.assets.filter(x=>acctGroup('asset',x.category)==='live'),liveL=S.nw.liabilities.filter(x=>acctGroup('liab',x.category)==='live');
   const liveSum=r2(liveA.reduce((s,x)=>s+x.value,0)-liveL.reduce((s,x)=>s+x.value,0));
   h+='<div class="sec-h"><h3>כסף שוטף</h3><button class="link" data-a="asset-add" data-v="checking">＋ הוספה</button></div>';
+  if(liveA.length+liveL.length)h+='<p class="hint" style="margin:-4px 2px 8px">'+GROUPS[0].hint+'</p>';
   h+=liveA.length+liveL.length
     ?'<div class="surface list">'+liveA.map(x=>nwRow(x,'asset',ASSET_CATS.find(c=>c.id===x.category))).join('')+
       liveL.map(x=>nwRow(x,'liab',LIAB_CATS.find(c=>c.id===x.category))).join('')+
@@ -1523,7 +1548,8 @@ function viewNw(){
     const stack=saveSum>0&&groups.length>1?'<div class="stack">'+pos.map(g=>'<i style="flex-grow:'+g.sum+';background:'+g.c.color+'"></i>').join('')+'</div>'+
       '<div class="legend">'+pos.map(g=>'<span><i style="background:'+g.c.color+'"></i>'+esc(g.c.name)+' <span class="num">'+pct(g.sum,saveSum)+'%</span></span>').join('')+'</div>':'';
     h+='<div class="surface" style="padding-top:14px;padding-bottom:4px">'+stack+groups.map(g=>
-      '<div class="grp-h"><span>'+g.c.icon+' '+esc(g.c.name)+'</span>'+money(g.sum)+'</div>'+g.items.map(x=>nwRow(x,'asset',g.c)).join('')).join('')+'</div>';
+      // סוג עם פריט אחד: בלי כותרת (היא הייתה חוזרת על אותו סכום), שם הסוג עובר לשורה
+      g.items.length>1?'<div class="grp-h"><span>'+g.c.icon+' '+esc(g.c.name)+'</span>'+money(g.sum)+'</div>'+g.items.map(x=>nwRow(x,'asset',g.c)).join(''):nwRow(g.items[0],'asset',g.c,true)).join('')+'</div>';
   }
 
   // חובות
@@ -1811,6 +1837,7 @@ function saveTx(){
     if(active)S.tx.transactions.push(t);
   }
   if(!xfer)setLastAcct(f.type,f.accountId);
+  if(!xfer&&!f.id)bumpCatUse(f.categoryId);
   if(!f.id&&f.repeat!=='once'){saveRecurringNew(f,fields,date);return;}
   const edited=!!f.id,tid=t.id;
   saveTxFx(t,prev);closeSheet();render();
@@ -1863,7 +1890,7 @@ function openNwSheet(kind,id,preset){
   const title=x?'עדכון '+x.name:(kind==='asset'?'חשבון חדש':'התחייבות חדשה');
   const html=sheetHead(title)+
     '<div class="field-label" style="margin-top:4px" id="n-value-label"></div>'+
-    '<label class="amount-wrap"><span class="cur">₪</span><input id="n-value" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" value="'+(x?x.value:'')+'"></label>'+
+    '<label class="amount-wrap"><span class="cur">₪</span><input id="n-value" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" value="'+(x?x.value:'')+'" data-orig="'+(x?x.value:'')+'"></label>'+
     '<p class="hint" style="text-align:center" id="n-hint"></p>'+
     '<div class="field-label">סוג</div><div class="chips wrap" id="n-cats">'+cats.map(c=>
       '<button class="chip '+(c.id===S.form.category?'on':'')+'" style="--c:'+c.color+'" data-a="f-acat" data-v="'+c.id+'">'+c.icon+' '+c.name+'</button>').join('')+'</div>'+
@@ -1893,7 +1920,9 @@ function saveNw(){
   const f=S.form;if(!f)return;
   const list=f.nk==='asset'?S.nw.assets:S.nw.liabilities,cats=f.nk==='asset'?ASSET_CATS:LIAB_CATS;
   const raw=$('#n-value').value,live=acctGroup(f.nk,f.category)==='live';
-  const neg=live&&f.nk==='asset'&&/^\s*[-−]/.test(raw),value=neg?-parseAmount(raw.replace(/^\s*[-−]/,'')):parseAmount(raw);
+  // סכום שלא נגעו בו נשאר הערך הנוכחי (גם אם השתנה בינתיים במכשיר אחר)
+  const cur0=f.id?list.find(i=>i.id===f.id):null;
+  const value=cur0&&raw.trim()===$('#n-value').dataset.orig?cur0.value:parseSigned(raw,live&&f.nk==='asset');
   if(!raw.trim()||!(Math.abs(value)>=0)){toast('צריך סכום תקין');focusEl($('#n-value'));return;}
   const name=$('#n-name').value.trim()||cats.find(c=>c.id===f.category).name;
   const now=Date.now();
@@ -1910,7 +1939,8 @@ function saveNw(){
   const edited=!!f.id,nk=f.nk;
   const rec=adjustRec(item,prev?prev.value:0,!prev,now);
   if(rec)S.tx.transactions.push(rec);
-  D.putItem(nk,item,pt,rec);closeSheet();render();
+  const delta=prev?r2(item.value-prev.value):undefined;
+  D.putItem(nk,item,pt,rec,delta);closeSheet();render();
   const iid=item.id;
   toast(edited?(pt?'העדכון נשמר ונוסף לגרף':'העדכון נשמר'):(nk==='asset'?'הנכס נוסף':'ההתחייבות נוספה'),'',()=>{
     const lst=nk==='asset'?S.nw.assets:S.nw.liabilities,cur=lst.find(i=>i.id===iid);
@@ -1918,7 +1948,7 @@ function saveNw(){
     else{const i=lst.indexOf(cur);if(i>=0)lst.splice(i,1);}
     if(pt)S.nw.history=S.nw.history.filter(p=>p.t!==pt.t);
     if(rec)S.tx.transactions=S.tx.transactions.filter(t=>t.id!==rec.id);
-    D.revertItem(nk,iid,prev,pt&&pt.t,rec&&rec.id);render();toast(prev?'העדכון בוטל':'ההוספה בוטלה');
+    D.revertItem(nk,iid,prev,pt&&pt.t,rec&&rec.id,delta);render();toast(prev?'העדכון בוטל':'ההוספה בוטלה');
   });
 }
 
@@ -1945,7 +1975,7 @@ function saveCat(){
 /* ================= sheet: עדכון מלא ================= */
 function bulkRow(kind,x,c){
   return '<label class="bulk-row"><span class="ic sm" style="--c:'+c.color+'">'+c.icon+'</span><span class="bulk-name">'+esc(x.name)+'</span>'+
-    '<input class="bulk-in" inputmode="decimal" enterkeyhint="next" autocomplete="off" data-kind="'+kind+'" data-id="'+esc(x.id)+'" value="'+x.value+'" aria-label="'+esc(x.name)+'"></label>';
+    '<input class="bulk-in" inputmode="decimal" enterkeyhint="next" autocomplete="off" data-kind="'+kind+'" data-id="'+esc(x.id)+'" value="'+x.value+'" data-orig="'+x.value+'" aria-label="'+esc(x.name)+'"></label>';
 }
 function bulkRows(kind,list,cats){
   let h='';
@@ -1961,7 +1991,7 @@ function bulkTotal(){
     const kind=inp.dataset.kind,list=kind==='asset'?S.nw.assets:S.nw.liabilities,x=list.find(i=>i.id===inp.dataset.id);
     let v=x?x.value:0;
     const raw=inp.value.trim();
-    if(raw!==''){const p=parseAmount(raw);if(p>=0)v=p;}
+    if(raw!==''){const p=parseSigned(raw,kind==='asset'&&!!x&&acctGroup(kind,x.category)==='live');if(isFinite(p))v=p;}
     if(kind==='asset')a+=v;else l+=v;
   });
   el.innerHTML=money(r2(a-l));
@@ -1986,16 +2016,16 @@ function saveBulk(){
     const list=kind==='asset'?S.nw.assets:S.nw.liabilities;
     const x=list.find(i=>i.id===el.dataset.id);if(!x)continue;
     let v=x.value;
-    if(raw!==''){
-      v=parseAmount(raw);
-      if(!(v>=0)){toast('סכום לא תקין ב"'+x.name+'"','err');focusEl(el,true);return;}
+    if(raw!==''&&raw!==el.dataset.orig){   // שדה שלא נגעו בו לא משנה את הערך (גם אם הוא השתנה בינתיים במכשיר אחר)
+      v=parseSigned(raw,kind==='asset'&&acctGroup(kind,x.category)==='live');   // עו"ש או מזומן יכולים להיות במינוס
+      if(!isFinite(v)){toast('סכום לא תקין ב"'+x.name+'"','err');focusEl(el,true);return;}
     }
     changes.push({kind,x,v});
   }
   if(!changes.length){closeSheet();return;}
-  const olds=changes.map(({kind,x})=>({kind,id:x.id,value:x.value,updatedAt:x.updatedAt}));
+  const olds=changes.map(({kind,x,v})=>({kind,id:x.id,value:x.value,updatedAt:x.updatedAt,d:r2(v-x.value)}));
   const recs=[];
-  const ups=changes.map(({kind,x,v})=>{const old=x.value;x.value=v;x.updatedAt=now;const r=adjustRec(x,old,false,now);if(r)recs.push(r);return{kind,id:x.id,value:v,updatedAt:now};});
+  const ups=changes.map(({kind,x,v})=>{const old=x.value;x.value=v;x.updatedAt=now;const r=adjustRec(x,old,false,now);if(r)recs.push(r);return{kind,id:x.id,d:r2(v-old),updatedAt:now};});
   recs.forEach(r=>S.tx.transactions.push(r));
   const pt=snapshot('עדכון מלא');
   D.bulk(ups,pt,recs);closeSheet();render();
@@ -2301,6 +2331,7 @@ document.addEventListener('click',async e=>{
       break;
     }
     case 'hist-toggle':S.histOpen=!S.histOpen;render();break;
+    case 'brk-toggle':S.brkOpen=!S.brkOpen;updateTxResults();break;
     case 'hist-del':{
       const ts=+id,old=S.nw.history.find(p=>p.t===ts);if(!old)break;
       const copy=Object.assign({},old);

@@ -91,5 +91,7 @@
 
 - הנחיות העבודה, מבנה הנתונים והתהליך: `CLAUDE.md` (נטען אוטומטית ב-Claude Code).
 - בדיקות אוטומטיות: `npm install` ואז `npm test` (על `beta/index.html`), או `npm run test:prod` (על `index.html`).
-- גיבוי לדוגמה לבדיקות: `tests/fixtures/finance-backup-demo.json`. לייבא **רק בסביבת הבדיקה**.
+- גיבוי לדוגמה לבדיקות: `tests/fixtures/finance-backup-demo.json` (כולל חשבונות, העברות, תנועות חוזרות ותשלומים). לייבא **רק בסביבת הבדיקה**.
+- צילומי מסך של כל המסכים (390px, בהיר וכהה): `npm run shots`, נשמרים ב-`shots/`. דורש Playwright עם Chromium.
+- GitHub Actions מריץ את הבדיקות על כל Pull Request (`.github/workflows/test.yml`).
 - רשימת הפיצ'רים המתוכננים: `docs/feature-proposals.md`.
