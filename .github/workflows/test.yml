@@ -1,0 +1,30 @@
+# מריץ את הבדיקות האוטומטיות על כל Pull Request ועל כל מיזוג ל-main.
+# ב-PR של העברה לייצור (שנוגע ב-index.html או sw.js בשורש) מוודא גם שהם זהים לקבצים שב-beta/.
+name: tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: בדיקות על beta/index.html
+        run: npm test
+      - name: העברה לייצור - השורש זהה לבטא
+        if: github.event_name == 'pull_request'
+        run: |
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if echo "$changed" | grep -qxE 'index\.html|sw\.js'; then
+            cmp index.html beta/index.html
+            cmp sw.js beta/sw.js
+            TARGET=index.html node tests/run.js
+          fi

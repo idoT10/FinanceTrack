@@ -11,6 +11,7 @@ module.exports=async t=>{
   A.tab('tx');for(let i=0;i<3;i++)A.click(A.$$('[data-a="month"]')[0]);await sleep(150);
   t.ok(A.$$('.tx-row').length>20,'an older month loads on demand ('+A.$('.mname').textContent.trim()+': '+A.$$('.tx-row').length+' rows)');
   A.tab('nw');await sleep(50);
-  t.ok(/לא עודכן מעל חודש/.test(A.$('#view').textContent),'stale items are marked');
+  t.ok(A.$$('.tx-sub.stale').length>3,'stale items are marked');
+  t.ok(keys(sh,P+'recurring/').length===B.rec.length&&[...sh.store.values()].some(v=>v.type==='transfer'&&v.note==='חיוב כרטיס אשראי'),'recurring templates and transfers imported');
   t.ok(!A.errors.length,'no script errors');
 };

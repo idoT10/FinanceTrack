@@ -4,7 +4,8 @@
   "description": "הכסף שלי – בדיקות אוטומטיות (האפליקציה עצמה היא index.html ולא צריכה build)",
   "scripts": {
     "test": "node tests/run.js",
-    "test:prod": "TARGET=index.html node tests/run.js"
+    "test:prod": "TARGET=index.html node tests/run.js",
+    "shots": "node tests/shots.js"
   },
   "devDependencies": {
     "jsdom": "^29.1.1"
