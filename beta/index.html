@@ -232,6 +232,9 @@ textarea.input{min-height:130px;direction:ltr;text-align:left;resize:vertical;fo
 .sheet-actions{display:flex;gap:10px;margin-top:22px}
 /* כפתורי הפעולה צמודים לתחתית החלון, כדי שהשמירה תמיד נראית (גם כשהתוכן ארוך וגם מעל המקלדת) */
 .sheet .sheet-actions{position:sticky;bottom:calc(-18px - var(--safe-b));margin:14px -18px calc(-18px - var(--safe-b));padding:12px 18px calc(18px + var(--safe-b));background:var(--surface);border-top:1px solid var(--line);z-index:2}
+.sheet.kb{padding-bottom:8px}
+.sheet.kb .sheet-actions{bottom:-8px;margin:10px -18px -8px;padding:8px 18px}
+.sheet.kb .sheet-actions .btn{padding:10px 16px;font-size:15px}
 .neg-btn{width:38px;height:38px;border-radius:10px;background:var(--sunk);font-weight:700;font-size:17px;display:grid;place-items:center;flex:none;color:var(--ink-2)}
 .neg-btn.on{background:color-mix(in srgb,var(--expense) 16%,var(--surface));color:var(--expense)}
 .brk-mini{display:block;width:100%;text-align:start}
@@ -479,7 +482,7 @@ const S={
   tx:{categories:[],transactions:[]},
   nw:{assets:[],liabilities:[],history:[]},
   rec:[],
-  view:'home',month:monthKey(new Date()),txType:'all',txCat:null,txQ:'',range:'all',
+  view:'home',month:monthKey(new Date()),txType:'all',txCat:null,txAcct:null,txQ:'',range:'all',
   catTab:'expense',histOpen:false,brkOpen:false,setPage:null,newVer:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
 };
 
@@ -544,7 +547,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.6',APP_BUILD='b2',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.6',APP_BUILD='b3',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
@@ -570,12 +573,14 @@ function wantedMonths(){
   return w;
 }
 function syncMonths(){if(S.ready&&D.setMonths)D.setMonths(wantedMonths());}
+const T0=typeof performance!=='undefined'?performance.now():0,TIMES={};   // זמני פתיחה, מוצגים בהגדרות של הבטא
+function mark(k){if(TIMES[k]===undefined&&typeof performance!=='undefined')TIMES[k]=Math.round(performance.now()-T0);}
 const SKEL='<div class="skel" style="height:150px"></div><div class="skel" style="height:260px;border-radius:26px"></div>';
 
 function markLoaded(k){
   S.loaded[k]=true;
   const first=!S.ready&&LOAD_KEYS.every(x=>S.loaded[x]);
-  if(first){S.ready=true;try{ensureMonthlyPoint();}catch(e){console.error(e);}setTimeout(async()=>{await backfillPaid();genRecurring();},0);}
+  if(first){mark('data');S.ready=true;try{ensureMonthlyPoint();}catch(e){console.error(e);}setTimeout(async()=>{await backfillPaid();genRecurring();},0);}
   if(S.ready)render();
   if(first&&S.quick){S.quick=false;openTxSheet();}
   if(first)checkNewVersion();
@@ -621,7 +626,10 @@ const D={
     const [app,auth,fs]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
     this.A=auth;this.F=fs;
     this.app=app.initializeApp(firebaseConfig);
-    this.auth=auth.getAuth(this.app);
+    // התחברות באימייל וסיסמה בלבד. getAuth() מוסיף גם את מנגנון הכניסה בחלון קופץ, שב-Safari נטען מהרשת
+    // לפני שההתחברות השמורה מדווחת, ומעכב את כל הפתיחה. לכן initializeAuth בלי המנגנון הזה, עם אותה שמירה מקומית
+    try{this.auth=auth.initializeAuth(this.app,{persistence:[auth.indexedDBLocalPersistence,auth.browserLocalPersistence,auth.browserSessionPersistence]});}
+    catch(e){console.warn(e);this.auth=auth.getAuth(this.app);}
     try{
       this.db=fs.initializeFirestore(this.app,{localCache:fs.persistentLocalCache({tabManager:fs.persistentMultipleTabManager()})});
     }catch(e){console.warn(e);this.db=fs.getFirestore(this.app);}
@@ -1268,8 +1276,9 @@ const sheetHead=t=>'<div class="sheet-head"><h2>'+esc(t)+'</h2><button class="ic
 function fitSheet(){
   const vv=window.visualViewport,sh=$('#sheet');
   if(!vv||!sh)return;
-  if(!sh.classList.contains('open')){sh.style.bottom='';sh.style.maxHeight='';return;}
+  if(!sh.classList.contains('open')){sh.style.bottom='';sh.style.maxHeight='';sh.classList.remove('kb');return;}
   const kb=Math.max(0,window.innerHeight-vv.height-vv.offsetTop);
+  sh.classList.toggle('kb',kb>80);   // מקלדת פתוחה: פס פעולות נמוך, בלי המרווח של תחתית המסך
   sh.style.bottom=kb+'px';
   sh.style.maxHeight=Math.min(vv.height-10,window.innerHeight*.92)+'px';
 }
@@ -1449,7 +1458,8 @@ function viewHome(){
 function txMonthData(){
   const mk=S.month,monthTx=S.tx.transactions.filter(t=>t.date.slice(0,7)===mk&&txVisible(t));
   const typed=S.txType==='all'?monthTx:S.txType==='transfer'?monthTx.filter(t=>!isFlow(t)):monthTx.filter(t=>t.type===S.txType);
-  const list=(S.txCat?typed.filter(t=>catKey(t)===S.txCat):typed).filter(t=>matchQ(t,S.txQ)).sort(sortTx);
+  const ofAcct=t=>!S.txAcct||t.accountId===S.txAcct||t.fromId===S.txAcct||t.toId===S.txAcct;
+  const list=(S.txCat?typed.filter(t=>catKey(t)===S.txCat):typed).filter(ofAcct).filter(t=>matchQ(t,S.txQ)).sort(sortTx);
   return{mk,monthTx,typed,list,tot:sumTx(monthTx)};
 }
 function viewTx(){
@@ -1473,8 +1483,14 @@ function viewTx(){
   h+='<div class="seg">'+[['all','הכל',''],['expense','הוצאות','exp'],['income','הכנסות','inc'],['transfer','העברות','']].map(([v,l,c])=>
     '<button data-a="tx-type" data-v="'+v+'" class="'+(S.txType===v?'on '+c:'')+'">'+l+'</button>').join('')+'</div>';
 
-  if(ids.length){
-    h+='<div class="chips scroll"><button class="chip '+(!S.txCat?'on':'')+'" data-a="tx-cat" data-id="">כל הקטגוריות</button>'+
+  // סינון לפי חשבון: שבב אחד בתחילת השורה. לחיצה פותחת בחירה; כשנבחר חשבון, לחיצה מנקה
+  if(S.txAcct&&!acctOf(S.txAcct))S.txAcct=null;
+  const fa=acctOf(S.txAcct);
+  const acctChipHtml=!allAccts().length?'':fa
+    ?'<button class="chip on" style="--c:'+acctCat(fa).color+'" data-a="tx-acct-clear" aria-label="ביטול הסינון לפי חשבון">'+esc(acctCat(fa).icon)+' '+esc(fa.x.name)+' ✕</button>'
+    :'<button class="chip" data-a="tx-acct">חשבון ▾</button>';
+  if(ids.length||acctChipHtml){
+    h+='<div class="chips scroll">'+acctChipHtml+(!ids.length?'':'<button class="chip '+(!S.txCat?'on':'')+'" data-a="tx-cat" data-id="">כל הקטגוריות</button>')+
       ids.map(id=>{const c=catView(id);return '<button class="chip '+(S.txCat===id?'on':'')+'" style="--c:'+c.color+'" data-a="tx-cat" data-id="'+esc(id)+'">'+esc(c.icon)+' '+esc(c.name)+'</button>';}).join('')+'</div>';
   }
   return h+'<div id="tx-results">'+txResults()+'</div>';
@@ -1483,13 +1499,15 @@ function viewTx(){
 function txResults(){
   const {mk,monthTx,list,tot}=txMonthData(),q=S.txQ.trim();
   let h='';
-  if((S.txCat||S.txType!=='all'||q)&&list.length){
+  const fa=acctOf(S.txAcct);
+  if((S.txCat||S.txType!=='all'||q||fa)&&list.length){
     const s=r2(list.reduce((x,t)=>x+t.amount,0));
-    h+='<div class="filter-sum">'+(list.length===1?'תנועה אחת':list.length+' תנועות')+(q?' מתאימות לחיפוש':' בסינון')+', בסך '+money(s,{dec:true})+'</div>';
+    h+='<div class="filter-sum">'+(list.length===1?'תנועה אחת':list.length+' תנועות')+(q?' מתאימות לחיפוש':' בסינון')+(fa?'':', בסך '+money(s,{dec:true}))+
+      (fa?' · יתרה ב'+esc(fa.x.name)+': '+money(fa.kind==='liab'?-fa.x.value:fa.x.value,{dec:true}):'')+'</div>';
   }
 
   const btype=S.txType==='income'?'income':'expense';
-  if(!S.txCat&&!q&&S.txType!=='transfer'){
+  if(!S.txCat&&!q&&!fa&&S.txType!=='transfer'){
     const bs={};
     for(const t of monthTx)if(t.type===btype){const k=catKey(t);bs[k]=(bs[k]||0)+t.amount;}
     const bids=Object.keys(bs).sort((a,b)=>bs[b]-bs[a]);
@@ -1677,7 +1695,8 @@ function viewSettings(){
       setRow('acct','👤','#7C8580','חשבון','<span class="num">'+esc(email)+'</span>')+
       (ENV==='beta'?setRow('beta','🧪','#D9822B','סביבת בדיקה','העתקת הנתונים האמיתיים וניקוי'):'')+
       setRow('','🗑️','#C83E52','מחיקת כל הנתונים','','reset')+'</div>'+
-    '<p class="foot">'+(S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות, '+S.nw.history.length+' נקודות בגרף<br>גרסה '+VERSION_LABEL+(ENV==='beta'?' · סביבת בדיקה':'')+'</p>';
+    '<p class="foot">'+(S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות, '+S.nw.history.length+' נקודות בגרף<br>גרסה '+VERSION_LABEL+(ENV==='beta'?' · סביבת בדיקה':'')+
+    (ENV==='beta'&&TIMES.data!==undefined?'<br>זמני פתיחה (מילישניות מתחילת הטעינה): ספרייה '+TIMES.lib+' · התחברות '+TIMES.auth+' · נתונים '+TIMES.data:'')+'</p>';
 }
 function catsSection(){
   const type=S.catTab,cats=S.tx.categories.filter(c=>c.type===type);
@@ -2289,10 +2308,10 @@ document.addEventListener('click',async e=>{
   switch(a){
     case 'nav':S.view=v;S.setPage=null;render();window.scrollTo(0,0);break;
     case 'set':
-      if(v==='rec'||v==='cats'){S.setPage=v;render();window.scrollTo(0,0);}
+      if(v==='rec'||v==='cats'){S.setPage=v;try{history.pushState({set:v},'');}catch(err){}render();window.scrollTo(0,0);}
       else if(v==='stats')openStatsSheet();else openSetSheet(v);
       break;
-    case 'set-back':S.setPage=null;render();window.scrollTo(0,0);break;
+    case 'set-back':S.setPage=null;render();window.scrollTo(0,0);try{if(history.state&&history.state.set)history.back();}catch(err){}break;
     case 'reload':location.reload();break;
     case 'n-neg':{const i=$('#n-value');if(i){i.value=/^\s*[-−]/.test(i.value)?i.value.replace(/^\s*[-−]/,''):'-'+i.value;sizeAmount(i);syncNwLabels();focusEl(i);}break;}
     case 'b-neg':{const i=$$('#sheet .bulk-in').find(x=>x.dataset.id===id);if(i){i.value=/^\s*[-−]/.test(i.value)?i.value.replace(/^\s*[-−]/,''):'-'+i.value;b.classList.toggle('on',i.value.startsWith('-'));bulkTotal();}break;}
@@ -2304,7 +2323,15 @@ document.addEventListener('click',async e=>{
     case 'month':S.month=v==='0'?monthKey(new Date()):shiftMonth(S.month,+v);render();break;
     case 'tx-type':S.txType=v;S.txCat=null;render();break;
     case 'tx-cat':S.txCat=(!id||S.txCat===id)?null:id;render();break;
-    case 'tx-clear':S.txCat=null;S.txType='all';S.txQ='';render();break;
+    case 'tx-clear':S.txCat=null;S.txType='all';S.txQ='';S.txAcct=null;render();break;
+    case 'tx-acct':
+      S.form={kind:'menu',v:'acct-filter'};
+      openSheet(sheetHead('סינון לפי חשבון')+'<div class="list" style="padding:0">'+allAccts().map(a=>
+        '<button class="tx-row" data-a="tx-acct-pick" data-id="'+esc(a.x.id)+'"><span class="ic" style="--c:'+acctCat(a).color+'">'+esc(acctCat(a).icon)+'</span><span class="tx-main"><span class="tx-title">'+esc(a.x.name)+'</span><span class="tx-sub">'+esc(acctCat(a).name)+'</span></span>'+
+        '<span class="tx-amt'+(a.kind==='liab'?' neg':'')+'">'+money(a.kind==='liab'?-a.x.value:a.x.value)+'</span></button>').join('')+'</div>');
+      break;
+    case 'tx-acct-pick':S.txAcct=id;closeSheet();render();break;
+    case 'tx-acct-clear':S.txAcct=null;render();break;
     case 'tx-q-clear':{S.txQ='';const i=$('#tx-search');if(i){i.value='';i.focus();}updateTxResults();break;}
     case 'tx-edit':openTxSheet(id);break;
     case 'range':S.range=v;render();break;
@@ -2488,6 +2515,12 @@ window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(S.r
 document.addEventListener('visibilitychange',()=>{if(document.hidden)return;checkNewVersion();if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready){render();genRecurring();}});
 window.addEventListener('online',()=>{syncUpdate();if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready){render();genRecurring();}});
 window.addEventListener('offline',()=>{syncUpdate();if(S.ready)render();});
+// החלקה אחורה באייפון (או כפתור "אחורה"): חוזרת מדף של ההגדרות לתפריט
+window.addEventListener('popstate',e=>{
+  const v=e.state&&e.state.set||null;
+  if(S.view!=='settings'||S.setPage===v)return;
+  S.setPage=v;if(S.ready){render();window.scrollTo(0,0);}
+});
 
 /* גרסה חדשה ירדה ברקע? ה-service worker שומר את מזהה הגרסה של הדף האחרון שהוריד (sw.js: META), ואנחנו משווים לשלנו */
 function checkNewVersion(){
@@ -2518,13 +2551,14 @@ function wantsQuickAdd(){
     setTimeout(checkNewVersion,4000);
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
-  try{await D.init();}
+  try{await D.init();mark('lib');}
   catch(e){
     console.error(e);
     $('#view').innerHTML='<div class="surface empty">לא ניתן לטעון את האפליקציה. בדקו את החיבור לאינטרנט ורעננו.</div>';
     return;
   }
   D.onAuth(user=>{
+    mark('auth');
     D.stop();
     if(!user){S.user=null;S.ready=false;S.noAccess=false;showAuth('in');return;}
     S.user=user;
