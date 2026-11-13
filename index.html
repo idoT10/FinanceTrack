@@ -171,6 +171,9 @@ h2.h{font-size:15px;font-weight:650;color:var(--ink-2)}
 /* קטגוריות: גוש של כמה שורות שנגלל לצדדים */
 .chips.block{display:grid;grid-auto-flow:column;grid-template-rows:repeat(var(--rows,1),auto);justify-content:start;overflow-x:auto;scrollbar-width:none;margin:0 -18px;padding:2px 18px}
 .chips.block::-webkit-scrollbar{display:none}
+.tx-row.dim{opacity:.55}
+.inst-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.inst-row .input{width:90px;text-align:center}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;background:var(--surface);border:1.5px solid var(--line);font-size:14.5px;font-weight:560;white-space:nowrap;flex:none}
 .chip.on{border-color:var(--c,var(--accent));background:color-mix(in srgb,var(--c,var(--accent)) 15%,var(--surface))}
 .chip.add{border-style:dashed;color:var(--accent)}
@@ -257,7 +260,7 @@ textarea.input{min-height:130px;direction:ltr;text-align:left;resize:vertical;fo
 .dlg{background:var(--surface);border-radius:20px;padding:20px;max-width:360px;width:100%}
 .dlg p{font-size:16px;margin-bottom:18px;line-height:1.5}
 .dlg .row{gap:10px}
-.toast{position:fixed;left:50%;bottom:calc(100px + var(--safe-b));transform:translate(-50%,16px);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:999px;font-size:14.5px;font-weight:620;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:90;white-space:nowrap}
+.toast{position:fixed;left:50%;bottom:calc(100px + var(--safe-b));transform:translate(-50%,16px);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:999px;font-size:14.5px;font-weight:620;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:90;max-width:calc(100vw - 32px);width:max-content;text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 .toast.undo{display:flex;align-items:center;gap:4px;padding-block:4px;padding-inline:18px 6px}
 .toast.undo.show{pointer-events:auto}
@@ -460,6 +463,7 @@ const defaultCats=()=>DEFAULT_CATS.map(([name,icon,type,color],i)=>({id:uid(),na
 const S={
   tx:{categories:[],transactions:[]},
   nw:{assets:[],liabilities:[],history:[]},
+  rec:[],
   view:'home',month:monthKey(new Date()),txType:'all',txCat:null,txQ:'',range:'all',
   catTab:'expense',histOpen:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
 };
@@ -480,9 +484,22 @@ function normTx(o){
     categoryId:t.categoryId?String(t.categoryId):null,catName:String(t.catName||''),date:t.date,note:String(t.note||''),createdAt:+t.createdAt||0,
     ...(t.accountId?{accountId:String(t.accountId)}:{}),
     ...(t.type==='transfer'?{fromId:String(t.fromId||''),toId:String(t.toId||'')}:{}),
-    ...(t.type==='adjust'?{delta:r2(+t.delta||0),value:r2(+t.value||0)}:{})
+    ...(t.type==='adjust'?{delta:r2(+t.delta||0),value:r2(+t.value||0)}:{}),
+    ...(t.recId?{recId:String(t.recId)}:{}),
+    ...(t.inst&&+t.inst.n>1?{inst:{i:+t.inst.i||1,n:+t.inst.n}}:{})
   }));
   return{categories:cats,transactions:txs};
+}
+/* תבנית של תנועה חוזרת (R3). count/total רק לתשלומים. lastMonth = החודש האחרון שבו נוצרה תנועה */
+function normRec(a){
+  const num=v=>isFinite(+v)?+v:0,mk=v=>/^\d{4}-\d{2}$/.test(v)?v:null;
+  return (Array.isArray(a)?a:[]).filter(r=>r&&r.id&&mk(r.startMonth)&&['expense','income','transfer'].includes(r.type)).map(r=>Object.assign({
+    id:String(r.id),type:r.type,amount:r2(num(r.amount)),categoryId:r.categoryId?String(r.categoryId):null,catName:String(r.catName||''),
+    note:String(r.note||''),day:Math.min(31,Math.max(1,Math.round(num(r.day))||1)),startMonth:r.startMonth,lastMonth:mk(r.lastMonth),
+    paused:!!r.paused,createdAt:num(r.createdAt)},
+    r.accountId?{accountId:String(r.accountId)}:{},
+    r.type==='transfer'?{fromId:String(r.fromId||''),toId:String(r.toId||'')}:{},
+    num(r.count)>1?Object.assign({count:Math.round(num(r.count)),total:r2(num(r.total))},r.paid!=null&&isFinite(+r.paid)?{paid:r2(+r.paid)}:{}):{}));
 }
 function normNw(o){
   o=o||{};
@@ -512,12 +529,12 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.4',APP_BUILD='b4',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.5',APP_BUILD='b3',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
-const DATA_COLS=['meta','categories','tx','assets','liabilities','history'];
+const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
 /* ================= firebase (נתונים + התחברות) ================= */
-const LOAD_KEYS=['profile','categories','month','recent','assets','liabilities','history'];
+const LOAD_KEYS=['profile','categories','month','recent','assets','liabilities','history','recurring'];
 
 /* ---------- תנועות: טעינה לפי צורך ----------
    התנועות נטענות ממספר מקורות קטנים: החודש הנוכחי, החודש שמוצג במסך התנועות, ו-10 האחרונות.
@@ -543,7 +560,7 @@ const SKEL='<div class="skel" style="height:150px"></div><div class="skel" style
 function markLoaded(k){
   S.loaded[k]=true;
   const first=!S.ready&&LOAD_KEYS.every(x=>S.loaded[x]);
-  if(first){S.ready=true;try{ensureMonthlyPoint();}catch(e){console.error(e);}}
+  if(first){S.ready=true;try{ensureMonthlyPoint();}catch(e){console.error(e);}setTimeout(async()=>{await backfillPaid();genRecurring();},0);}
   if(S.ready)render();
   if(first&&S.quick){S.quick=false;openTxSheet();}
 }
@@ -624,6 +641,7 @@ const D={
     this.listen('assets',a=>{S.nw.assets=normNw({assets:a}).assets;});
     this.listen('liabilities',a=>{S.nw.liabilities=normNw({liabilities:a}).liabilities;});
     this.listen('history',a=>{S.nw.history=normNw({history:a}).history;});
+    this.listen('recurring',a=>{S.rec=normRec(a);});
     this.setMonths(wantedMonths());
   },
   monthSubs:{},
@@ -678,11 +696,49 @@ const D={
   putCat(c){const {id,...r}=c;this.w(this.F.setDoc(this.ref('categories',id),r));},
   delCat(id){this.w(this.F.deleteDoc(this.ref('categories',id)));},
   putTx(t){const {id,...r}=t;this.w(this.F.setDoc(this.ref('tx',id),r));},
+  /* R3: יצירת תנועה חוזרת לחודש mk, רק אם התבנית עוד לא טופלה בחודש הזה (עסקה אטומית מול השרת) */
+  async recGenerate(recId,mk,build){
+    syncBegin();
+    try{
+      return await this.F.runTransaction(this.db,async tr=>{
+        const ref=this.ref('recurring',recId),snap=await tr.get(ref);
+        if(!snap.exists())return null;
+        const d=snap.data();
+        if(d.paused||(d.lastMonth&&d.lastMonth>=mk))return null;
+        const {t,fx}=build(d),{id,...r}=t;
+        tr.set(this.ref('tx',id),r);
+        fx.forEach(e=>tr.update(this.ref(this.itemCol(e.kind),e.id),{value:this.F.increment(e.d)}));
+        tr.update(ref,Object.assign({lastMonth:mk},t.inst&&d.paid!=null?{paid:this.F.increment(t.amount)}:{}));
+        return{t,fx};
+      });
+    }finally{syncEnd();}
+  },
+  /* תבנית חדשה, יחד עם התנועות שהיום שלהן כבר הגיע (עובד גם בלי חיבור). txs: מערך או null */
+  putRec(r,txs,fx){
+    const {id,...rr}=r,ops=[{ref:this.ref('recurring',id),data:rr}];
+    (txs||[]).forEach(t=>{const {id:tid,...tt}=t;ops.push({ref:this.ref('tx',tid),data:tt});});
+    (fx||[]).forEach(e=>ops.push({ref:this.ref(this.itemCol(e.kind),e.id),update:true,data:{value:this.F.increment(e.d)}}));
+    this.w(this.runOps(ops));
+  },
+  updRec(id,data){this.w(this.F.updateDoc(this.ref('recurring',id),data));},
+  delRec(id){this.w(this.F.deleteDoc(this.ref('recurring',id)));},
+  async recPaidSum(id){
+    const F=this.F,snap=await F.getDocsFromServer(F.query(this.col('tx'),F.where('recId','==',id)));
+    return r2(snap.docs.reduce((s,d)=>s+(+d.data().amount||0),0));
+  },
+  /* ביטול יצירה: מוחקים את התבנית ואת התנועה הראשונה, ומחזירים את היתרות */
+  undoRec(id,txs,fx){
+    const ops=[{ref:this.ref('recurring',id),del:true}];
+    (txs||[]).forEach(t=>ops.push({ref:this.ref('tx',t.id),del:true}));
+    (fx||[]).forEach(e=>ops.push({ref:this.ref(this.itemCol(e.kind),e.id),update:true,data:{value:this.F.increment(e.d)}}));
+    this.w(this.runOps(ops));
+  },
   /* תנועה + עדכון יתרות באותה פעולה. increment מתחבר נכון גם כששני מכשירים או מצב לא מקוון כותבים במקביל */
-  txWrite(t,fx){
+  txWrite(t,fx,paidFx){
     const b=this.F.writeBatch(this.db);
     if(t.del)b.delete(this.ref('tx',t.id));else{const {id,...r}=t;b.set(this.ref('tx',id),r);}
     (fx||[]).forEach(e=>b.update(this.ref(this.itemCol(e.kind),e.id),{value:this.F.increment(e.d)}));
+    (paidFx||[]).forEach(e=>b.update(this.ref('recurring',e.id),{paid:this.F.increment(e.d)}));
     this.w(b.commit());
   },
   delTx(id){this.w(this.F.deleteDoc(this.ref('tx',id)));},
@@ -738,12 +794,13 @@ const D={
     };
     await Promise.all(Array.from({length:Math.min(PAR,chunks.length)},worker));
   },
-  async importAll(tx,nw){
+  async importAll(tx,nw,rec){
     syncBegin();
-    try{await this._importAll(tx,nw);}finally{syncEnd();}
+    try{await this._importAll(tx,nw,rec);}finally{syncEnd();}
   },
-  async _importAll(tx,nw){
+  async _importAll(tx,nw,rec){
     const ops=[];
+    (rec||[]).forEach(r=>{const {id,...d}=r;ops.push({ref:this.ref('recurring',id),data:d});});
     tx.categories.forEach(c=>{const {id,...r}=c;ops.push({ref:this.ref('categories',id),data:r});});
     tx.transactions.forEach(t=>{const {id,...r}=t;ops.push({ref:this.ref('tx',id),data:r});});
     nw.assets.forEach(x=>{const {id,...r}=x;ops.push({ref:this.ref('assets',id),data:r});});
@@ -762,6 +819,7 @@ const D={
     old.assets.forEach(id=>ops.push({ref:this.ref('assets',id),del:true}));
     old.liabs.forEach(id=>ops.push({ref:this.ref('liabilities',id),del:true}));
     old.hist.forEach(id=>ops.push({ref:this.ref('history',id),del:true}));
+    (old.recs||[]).forEach(id=>ops.push({ref:this.ref('recurring',id),del:true}));
     cats.forEach(c=>{const {id,...r}=c;ops.push({ref:this.ref('categories',id),data:r});});
     try{await this.runOps(ops);}catch(e){console.error(e);toast('המחיקה לא הושלמה. נסו שוב'+errTag(e),'err');}
   },
@@ -936,8 +994,108 @@ function mergeFx(list){
 const negFx=fx=>fx.map(e=>Object.assign({},e,{d:-e.d}));
 function applyFxLocal(fx){for(const e of fx){const a=acctOf(e.id);if(a)a.x.value=r2(a.x.value+e.d);}}
 /* שמירה/מחיקה של תנועה יחד עם עדכון היתרות (prev = הגרסה הקודמת בעריכה) */
-function saveTxFx(t,prev){const fx=mergeFx([...(prev?negFx(txEffects(prev)):[]),...txEffects(t)]);applyFxLocal(fx);D.txWrite(t,fx);}
-function delTxFx(t){const fx=mergeFx(negFx(txEffects(t)));applyFxLocal(fx);D.txWrite({id:t.id,del:true},fx);}
+/* תשלום שנערך/נמחק/הוחזר משנה את "שולם" בתבנית, כדי שהיתרה תתחלק מחדש על התשלומים הבאים */
+function paidFx(t,prev){
+  const m=new Map(),add=(x,s)=>{if(!x||!x.inst||!x.recId)return;m.set(x.recId,(m.get(x.recId)||0)+s*x.amount);};
+  add(t,1);add(prev,-1);
+  const out=[];
+  m.forEach((d,id)=>{const r=S.rec.find(x=>x.id===id);d=r2(d);if(r&&r.paid!=null&&d){r.paid=r2(r.paid+d);out.push({id,d});}});
+  return out;
+}
+function saveTxFx(t,prev){const fx=mergeFx([...(prev?negFx(txEffects(prev)):[]),...txEffects(t)]);applyFxLocal(fx);D.txWrite(t,fx,paidFx(t,prev));}
+function delTxFx(t){const fx=mergeFx(negFx(txEffects(t)));applyFxLocal(fx);D.txWrite({id:t.id,del:true},fx,paidFx(null,t));}
+/* ================= תנועות חוזרות ותשלומים (R3) ================= */
+const monthsDiff=(a,b)=>(+b.slice(0,4)*12+ +b.slice(5,7))-(+a.slice(0,4)*12+ +a.slice(5,7));
+function dayIn(mk,day){const last=new Date(+mk.slice(0,4),+mk.slice(5,7),0).getDate();return mk+'-'+String(Math.min(day,last)).padStart(2,'0');}
+/* תשלומים שווים; השארית (אגורות) בתשלום הראשון, כמו בחברות האשראי */
+function instAmount(r,i){const base=Math.floor(r.total/r.count*100)/100;return i===1?r2(r.total-base*(r.count-1)):base;}
+/* כמה שולם עד עכשיו: paid אם ידוע (b3), אחרת לפי החלוקה המקורית */
+function recPaid(r,upto){
+  if(r.paid!=null)return r.paid;
+  let s=0;for(let i=1;i<upto;i++)s+=instAmount(r,i);return r2(s);
+}
+/* סכום התשלום i. מה שנשאר מתחלק שווה על התשלומים שנשארו; האחרון סוגר את האגורות.
+   כך עריכה או מחיקה של תשלום מתחלקת מחדש על הבאים */
+function payAmount(r,i){
+  if(r.paid==null||i===1&&!r.paid)return instAmount(r,i);
+  const left=Math.max(0,r2(r.total-r.paid)),k=r.count-i+1;
+  if(k<=1)return left;
+  return Math.floor(left/k*100)/100;
+}
+const recNext=r=>r.lastMonth?shiftMonth(r.lastMonth,1):r.startMonth;
+const recIndex=(r,mk)=>monthsDiff(r.startMonth,mk)+1;
+const recDone=r=>!!r.count&&(recIndex(r,recNext(r))>r.count||(r.paid!=null&&r.total-r.paid<0.005));
+const recLabel=r=>r.note||(r.type==='transfer'?acctName(r.fromId)+' ← '+acctName(r.toId):(catView(r.categoryId).id==='_none'?r.catName:catView(r.categoryId).name))||'תנועה חוזרת';
+/* התנועה של חודש mk. מזהה דטרמיניסטי (תבנית+חודש), כדי ששני מכשירים לא ייצרו כפילות */
+function recTx(r,mk){
+  const i=r.count?recIndex(r,mk):0;
+  return Object.assign({id:'r-'+r.id+'-'+mk,type:r.type,amount:i?payAmount(r,i):r.amount,categoryId:r.categoryId,catName:r.catName,
+    date:dayIn(mk,r.day),note:r.note,createdAt:Date.now(),recId:r.id},
+    r.type==='transfer'?{fromId:r.fromId,toId:r.toId}:(r.accountId?{accountId:r.accountId}:{}),
+    i?{inst:{i,n:r.count}}:{});
+}
+/* החודשים שהגיע זמנם ועוד לא נוצרו (כולל השלמה של חודשים שהוחמצו) */
+function recDue(r){
+  const out=[],today=todayStr(),cur=monthKey(new Date());
+  if(r.paused)return out;
+  for(let m=recNext(r);m<=cur;m=shiftMonth(m,1)){
+    if(r.count&&recIndex(r,m)>r.count)break;
+    if(r.count&&r.paid!=null&&r.total-r.paid<0.005)break;
+    if(dayIn(m,r.day)>today)break;
+    out.push(m);
+  }
+  return out;
+}
+/* כמה נשאר לשלם בתשלומים שעוד לא נוצרו */
+function recRemaining(r){
+  if(!r.count)return 0;
+  return Math.max(0,r2(r.total-recPaid(r,recIndex(r,recNext(r)))));
+}
+const committedInst=()=>r2(S.rec.reduce((s,r)=>s+recRemaining(r),0));
+/* צפוי עוד החודש: תבניות שהיום שלהן החודש עוד לא הגיע */
+function expectedThisMonth(){
+  const cur=monthKey(new Date()),today=todayStr(),o={exp:0,inc:0};
+  for(const r of S.rec){
+    if(r.paused||recNext(r)!==cur||dayIn(cur,r.day)<=today)continue;
+    if(r.count&&recIndex(r,cur)>r.count)continue;
+    const a=r.count?payAmount(r,recIndex(r,cur)):r.amount;
+    if(r.type==='expense')o.exp+=a;else if(r.type==='income')o.inc+=a;
+  }
+  return{exp:r2(o.exp),inc:r2(o.inc)};
+}
+/* תבניות תשלומים מלפני b3 (בלי paid): מחשבים פעם אחת מהתשלומים שכבר נוצרו (קריאה מהשרת, רק עם חיבור) */
+async function backfillPaid(){
+  if(navigator.onLine===false)return;
+  for(const r of S.rec.filter(x=>x.count&&x.paid==null)){
+    try{const sum=await D.recPaidSum(r.id);r.paid=sum;D.updRec(r.id,{paid:sum});}catch(e){console.error(e);return;}
+  }
+}
+/* יוצרת את התנועות שהגיע זמנן. כל חודש בפעולה אטומית מול השרת (רק עם חיבור), כך ששני מכשירים לא ייצרו פעמיים */
+let recBusy=false;
+async function genRecurring(){
+  if(recBusy||!S.ready||!S.rec.length||navigator.onLine===false)return;
+  recBusy=true;let n=0;
+  try{
+    for(const r of S.rec.slice()){
+      for(const m of recDue(r)){
+        // הסכום מחושב מהעותק שבשרת בתוך העסקה (paid עדכני גם אם מכשיר אחר שינה)
+        const build=d=>{const rr=normRec([Object.assign({},d,{id:r.id})])[0];const t=recTx(rr,m);return{t,fx:mergeFx(txEffects(t))};};
+        let res;
+        try{res=await D.recGenerate(r.id,m,build);}catch(e){console.error(e);return;}
+        r.lastMonth=m;
+        if(!res)continue;
+        const {t,fx}=res;
+        if(r.count)r.paid=r2((r.paid!=null?r.paid:recPaid(r,recIndex(r,m)))+t.amount);
+        n++;
+        if(wantedMonths().has(m)&&!S.tx.transactions.some(x=>x.id===t.id))S.tx.transactions.push(t);
+        applyFxLocal(fx);
+      }
+    }
+  }finally{
+    recBusy=false;
+    if(n){render();toast(n===1?'נוספה תנועה חוזרת':'נוספו '+n+' תנועות חוזרות');}
+  }
+}
 /* החשבון האחרון נזכר בנפרד להוצאה ולהכנסה (לכל מכשיר). העברות לא משנות אותו */
 const lastAcctKey=type=>'fin-last-acct-'+ENV+'-'+(type==='income'?'income':'expense');
 function lastAcct(type){try{const id=localStorage.getItem(lastAcctKey(type));return id==='none'?null:(isLive(acctOf(id))?id:null);}catch(e){return null;}}
@@ -1095,14 +1253,15 @@ function txRow(t,withDate){
     '<span class="tx-amt '+(cls||'')+'">'+amtHtml+'</span></button>';
   if(t.type==='transfer'){
     const path=acctName(t.fromId)+' ← '+acctName(t.toId);
-    return row('⇄','#7C8580',t.note||path,[t.note?path:'',d].filter(Boolean).join(', '),money(t.amount,{dec:true}),'xfer');
+    return row('⇄','#7C8580',t.note||path,[t.note?path:'',t.recId?'🔁':'',d].filter(Boolean).join(', '),money(t.amount,{dec:true}),'xfer');
   }
   if(t.type==='adjust'){
     return row('⚖️','#7C8580',t.note||'התאמת יתרה',[acctName(t.accountId),d].filter(Boolean).join(', '),money(t.delta,{sign:true,dec:true}),'xfer');
   }
   const c=catView(t.categoryId);
   const cname=(c.id==='_none'&&t.catName)?t.catName:c.name;
-  const sub=[t.note?cname:'',t.accountId?acctName(t.accountId):'',d].filter(Boolean).join(', ');
+  const rec=t.inst?'תשלום '+t.inst.i+' מתוך '+t.inst.n:t.recId?'🔁':'';
+  const sub=[t.note?cname:'',t.accountId?acctName(t.accountId):'',rec,d].filter(Boolean).join(', ');
   return row(c.icon,c.color,t.note||cname,sub,money(flowSigned(t),{sign:true,dec:true}),t.type==='income'?'pos':'');
 }
 function barRow(id,sum,total,action,extra){
@@ -1222,6 +1381,8 @@ function viewHome(){
   let hint;
   if(!monthTx.length)hint='<p class="hint">עוד אין תנועות החודש. לחיצה על ＋ מוסיפה את הראשונה.</p>';
   else{const sr=saveRate(inc,exp);hint=sr.rate===null?'<p class="hint">'+sr.text+'</p>':'<p class="save-rate">'+sr.html+'</p>';}
+  const ex=expectedThisMonth();
+  if(ex.exp||ex.inc)hint+='<p class="hint">צפוי עוד החודש: '+[ex.exp?'הוצאות <b>'+money(ex.exp)+'</b>':'',ex.inc?'הכנסות <b>'+money(ex.inc)+'</b>':''].filter(Boolean).join(' · ')+'</p>';
   const inv=investedOf(monthTx);
   if(inv)hint+='<p class="hint">'+(inv>0?'הושקע החודש: <b>'+money(inv)+'</b>':'נמשך מהחיסכון החודש: <b>'+money(-inv)+'</b>')+'</p>';
 
@@ -1366,11 +1527,12 @@ function viewNw(){
   }
 
   // חובות
-  const debtL=S.nw.liabilities.filter(x=>acctGroup('liab',x.category)==='debt');
+  const debtL=S.nw.liabilities.filter(x=>acctGroup('liab',x.category)==='debt'),committed=committedInst();
   h+='<div class="sec-h"><h3>חובות</h3><button class="link" data-a="liab-add">＋ הוספה</button></div>';
   h+=debtL.length
     ?'<div class="surface list">'+debtL.slice().sort((a,b)=>b.value-a.value).map(x=>nwRow(x,'liab',LIAB_CATS.find(c=>c.id===x.category)||LIAB_CATS[3])).join('')+'</div>'
     :'<div class="surface empty">אין חובות רשומים.</div>';
+  if(committed)h+='<p class="hint" style="margin:8px 2px 0">מחויב לחודשים הבאים מתשלומים: <b>'+money(committed)+'</b> (לא נכלל בשווי הנקי)</p>';
 
   const hist=S.nw.history;
   if(hist.length){
@@ -1388,6 +1550,69 @@ function viewNw(){
   return h;
 }
 
+/* הגדרות ← תנועות חוזרות ותשלומים */
+function recStatus(r){
+  if(recDone(r))return 'הסתיים';
+  const nx=dayIn(recNext(r),r.day),parts=[];
+  if(r.count)parts.push('תשלום '+Math.min(r.count,recIndex(r,recNext(r))-1)+'/'+r.count+', נשארו '+money(recRemaining(r)));
+  else parts.push('כל חודש ב־'+r.day);
+  if(r.paused)parts.push('מושהה');else parts.push('הבא: '+esc(dayShort(nx)));
+  const acct=r.type==='transfer'?'':r.accountId?acctName(r.accountId):'';
+  if(acct)parts.push(esc(acct));   // מחזירה HTML (הסכום כולל תגיות), ולכן הטקסט עובר esc כאן
+  return parts.join(' · ');
+}
+function recRow(r){
+  const c=r.type==='transfer'?{icon:'⇄',color:'#7C8580'}:catView(r.categoryId);
+  const amt=r.type==='income'?money(r.count?r.total:r.amount):r.type==='transfer'?money(r.amount):money(-(r.count?r.total:r.amount),{sign:true});
+  return '<button class="tx-row'+(r.paused||recDone(r)?' dim':'')+'" data-a="rec-edit" data-id="'+esc(r.id)+'"><span class="ic" style="--c:'+c.color+'">'+esc(c.icon)+'</span>'+
+    '<span class="tx-main"><span class="tx-title">'+esc(recLabel(r))+'</span><span class="tx-sub">'+recStatus(r)+'</span></span>'+
+    '<span class="tx-amt '+(r.type==='income'?'pos':r.type==='transfer'?'xfer':'')+'">'+amt+'</span></button>';
+}
+function recSection(){
+  const act=S.rec.filter(r=>!r.paused&&!recDone(r));
+  const mon=t=>r2(act.filter(r=>r.type===t).reduce((s,r)=>s+r.amount,0));
+  const exp=mon('expense'),inc=mon('income'),com=committedInst();
+  const list=S.rec.slice().sort((a,b)=>(recDone(a)-recDone(b))||(a.paused-b.paused)||(a.day-b.day));
+  let h='<div class="sec-h"><h3>תנועות חוזרות ותשלומים</h3></div>';
+  if(!list.length)return h+'<div class="surface empty">שכירות, משכורת, מנויים או קנייה בתשלומים. מוסיפים מחלון ההוספה: "כל חודש" או "בתשלומים".</div>';
+  h+='<div class="surface list">'+
+    ((exp||inc||com)?'<p class="muted small" style="padding:10px 2px 4px">'+[exp?'הוצאות קבועות בחודש: <b>'+money(exp)+'</b>':'',inc?'הכנסות קבועות: <b>'+money(inc)+'</b>':'',com?'נשאר לשלם בתשלומים: <b>'+money(com)+'</b>':''].filter(Boolean).join(' · ')+'</p>':'')+
+    list.map(recRow).join('')+'</div>';
+  return h;
+}
+function openRecSheet(id){
+  const r=S.rec.find(x=>x.id===id);if(!r)return;
+  S.form={kind:'rec',id:r.id,type:r.type,accountId:r.accountId||null};
+  const inst=!!r.count;
+  openSheet(sheetHead(inst?'קנייה בתשלומים':'תנועה חוזרת')+
+    '<p class="hint" style="text-align:center;margin-top:0">'+recStatus(r)+'</p>'+
+    (inst?'<p style="margin:6px 0">'+money(r.total,{dec:true})+' ב־'+r.count+' תשלומים של '+money(r.amount,{dec:true})+'</p>'
+      :'<label class="amount-wrap"><span class="cur">₪</span><input id="r-amount" inputmode="decimal" enterkeyhint="done" autocomplete="off" value="'+r.amount+'" aria-label="סכום"></label>')+
+    '<div class="field-label">תיאור</div><input id="r-note" class="input" enterkeyhint="done" autocomplete="off" placeholder="למשל: שכירות" value="'+esc(r.note)+'">'+
+    (inst?'':'<div class="field-label">יום בחודש</div><input id="r-day" class="input" inputmode="numeric" autocomplete="off" style="width:90px;text-align:center" value="'+r.day+'">')+
+    (r.type==='transfer'?'':'<div id="f-acct-sec"><div class="field-label" id="f-acct-label"></div><div class="chips line" id="f-accts"></div></div>')+
+    '<p class="hint">שינויים חלים על החודשים הבאים. תנועות שכבר נוצרו לא משתנות.</p>'+
+    '<div class="sheet-actions"><button class="btn ghost danger" data-a="rec-del">מחיקה</button>'+
+    (recDone(r)?'':'<button class="btn ghost" data-a="rec-pause">'+(r.paused?'חידוש':'השהיה')+'</button>')+
+    '<button class="btn primary grow" data-a="rec-save" data-primary>שמירה</button></div>');
+  if(r.type!=='transfer')renderAcctChips();
+}
+function saveRec(){
+  const f=S.form;if(!f||f.kind!=='rec')return;
+  const r=S.rec.find(x=>x.id===f.id);if(!r)return;
+  const prev=Object.assign({},r),upd={note:$('#r-note').value.trim()};
+  if($('#r-amount')){const a=parseAmount($('#r-amount').value);if(!(a>0)){toast('צריך סכום גדול מאפס');focusEl($('#r-amount'));return;}upd.amount=a;}
+  if($('#r-day')){const d=parseInt($('#r-day').value,10);if(!(d>=1&&d<=31)){toast('יום בחודש: 1 עד 31');focusEl($('#r-day'),true);return;}upd.day=d;}
+  if(r.type!=='transfer')upd.accountId=f.accountId&&acctOf(f.accountId)?f.accountId:null;
+  Object.assign(r,upd);if(!r.accountId)delete r.accountId;
+  D.updRec(r.id,Object.assign({},upd,upd.accountId===null?{accountId:D.F.deleteField()}:{}));
+  closeSheet();render();
+  toast('נשמר','',()=>{
+    Object.keys(r).forEach(k=>delete r[k]);Object.assign(r,prev);
+    const back={note:prev.note,amount:prev.amount,day:prev.day,accountId:prev.accountId||D.F.deleteField()};
+    D.updRec(r.id,back);render();toast('השינויים בוטלו');
+  });
+}
 function viewSettings(){
   const type=S.catTab,cats=S.tx.categories.filter(c=>c.type===type);
   const email=S.user&&S.user.email?S.user.email:'';
@@ -1405,6 +1630,7 @@ function viewSettings(){
   h+='<div class="sec-h"><h3>מראה</h3></div><div class="seg">'+[['auto','אוטומטי'],['light','בהיר'],['dark','כהה']].map(([v,l])=>
     '<button data-a="theme" data-v="'+v+'" class="'+(th===v?'on':'')+'">'+l+'</button>').join('')+'</div>'+
     '<p class="hint" style="margin:8px 2px 0">"אוטומטי" לפי הגדרת הטלפון. הבחירה חלה על המכשיר הזה בלבד.</p>';
+  h+=recSection();
   h+='<div class="sec-h"><h3>קטגוריות</h3></div>';
   h+='<div class="seg" style="margin-bottom:10px"><button data-a="cat-tab" data-v="expense" class="'+(type==='expense'?'on exp':'')+'">הוצאות</button><button data-a="cat-tab" data-v="income" class="'+(type==='income'?'on inc':'')+'">הכנסות</button></div>';
   h+='<div class="surface list">'+(cats.length?cats.map(c=>
@@ -1444,7 +1670,7 @@ function openTxSheet(id){
   if(t&&t.type==='adjust'){openAdjustSheet(t);return;}
   const f=S.form={kind:'tx',id:t?t.id:null,type:t?t.type:'expense',
     categoryId:t&&S.tx.categories.some(c=>c.id===t.categoryId)?t.categoryId:null,date:t?t.date:todayStr(),
-    accountId:t?(t.accountId||null):lastAcct('expense'),fromId:t?(t.fromId||null):lastAcct('expense'),toId:t&&t.toId||null};
+    accountId:t?(t.accountId||null):lastAcct('expense'),fromId:t?(t.fromId||null):lastAcct('expense'),toId:t&&t.toId||null,repeat:'once'};
   const html=sheetHead(t?'עריכת תנועה':'הוספה מהירה')+
     '<div class="seg" id="f-type"><button data-a="f-type" data-v="expense">הוצאה</button><button data-a="f-type" data-v="income">הכנסה</button><button data-a="f-type" data-v="transfer">העברה</button></div>'+
     '<label class="amount-wrap" id="f-amount-wrap"><span class="cur">₪</span><input id="f-amount" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" aria-label="סכום" value="'+(t?t.amount:'')+'"></label>'+
@@ -1454,6 +1680,12 @@ function openTxSheet(id){
     '<div id="f-acct-sec"><div class="field-label" id="f-acct-label">מאיזה חשבון</div><div class="chips line" id="f-accts"></div></div>'+
     '<div id="f-xfer-sec"><div class="field-label">מחשבון</div><div class="chips line" id="f-from"></div><div class="field-label">לחשבון</div><div class="chips line" id="f-to"></div></div>'+
     '<div class="field-label">תאריך</div><div class="date-row"><div class="chips" id="f-datechips"><button class="chip" data-a="f-date" data-v="t">היום</button><button class="chip" data-a="f-date" data-v="y">אתמול</button></div><input type="date" id="f-date" class="input" value="'+f.date+'"></div>'+
+    (t&&t.recId?'<p class="hint">'+(t.inst?'שינוי הסכום כאן משנה את מה שנשאר: היתרה תתחלק מחדש על התשלומים הבאים.':'שינוי כאן חל רק על התנועה הזאת. לשינוי החודשים הבאים: הגדרות ← תנועות חוזרות ותשלומים.')+'</p>':'')+
+    (t?'':'<div id="f-rep-sec"><div class="field-label">חזרה</div><div class="chips wrap" id="f-rep">'+
+      '<button class="chip on" data-a="f-rep" data-v="once">פעם אחת</button><button class="chip" data-a="f-rep" data-v="monthly">🔁 כל חודש</button>'+
+      '<button class="chip" data-a="f-rep" data-v="inst" id="f-rep-inst">בתשלומים</button></div>'+
+      '<div class="inst-row" id="f-inst-row" hidden><span>מספר תשלומים</span><input id="f-inst" class="input" inputmode="numeric" autocomplete="off" value="3" aria-label="מספר תשלומים"></div>'+
+      '<p class="hint" id="f-rep-hint"></p></div>')+
     '<div class="sheet-actions">'+(t?'<button class="btn ghost danger" data-a="tx-del">מחיקה</button>':'')+'<button class="btn primary grow" data-a="tx-save" data-primary>'+(t?'שמירת שינויים':'שמירה')+'</button></div>';
   openSheet(html);
   syncTxType();syncDateChips();
@@ -1502,7 +1734,26 @@ function syncTxType(){
   const w=$('#f-amount-wrap');if(w)w.className='amount-wrap '+cls;
   $('#f-cat-sec').hidden=v==='transfer';$('#f-xfer-sec').hidden=v!=='transfer';
   if(v==='transfer')renderXferChips();else renderCatChips();
-  renderAcctChips();
+  renderAcctChips();syncRep();
+}
+/* חזרה: פעם אחת / כל חודש / בתשלומים (תשלומים רק בהוצאה). רק בתנועה חדשה */
+function syncRep(){
+  const f=S.form;if(!f||!$('#f-rep-sec'))return;
+  if(f.repeat==='inst'&&f.type!=='expense')f.repeat='once';
+  $('#f-rep-inst').hidden=f.type!=='expense';
+  $$('#f-rep .chip').forEach(b=>b.classList.toggle('on',b.dataset.v===f.repeat));
+  $('#f-inst-row').hidden=f.repeat!=='inst';
+  const date=$('#f-date')&&/^\d{4}-\d{2}-\d{2}$/.test($('#f-date').value)?$('#f-date').value:todayStr(),day=+date.slice(8);
+  let h='';
+  if(f.repeat==='monthly')h='תיווצר לבד כל חודש ב־'+day+' לחודש. ניהול בהגדרות ← תנועות חוזרות.';
+  else if(f.repeat==='inst'){
+    const total=parseAmount($('#f-amount').value),n=parseInt($('#f-inst').value,10);
+    if(total>0&&n>=2&&n<=60){
+      const r={total,count:n},first=instAmount(r,1),base=instAmount(r,2);
+      h=n+' × '+money(base,{dec:true})+(first!==base?' (הראשון '+money(first,{dec:true})+')':'')+', כל חודש ב־'+day+' לחודש.';
+    }else h='הסכום שמקלידים הוא הסכום הכולל. מספר תשלומים: 2 עד 60.';
+  }
+  $('#f-rep-hint').innerHTML=h;$('#f-rep-hint').hidden=!h;
 }
 function renderCatChips(){
   const f=S.form,box=$('#f-cats');if(!box||!f)return;
@@ -1546,17 +1797,21 @@ function saveTx(){
   const fields=xfer
     ?{type:'transfer',amount,categoryId:null,catName:'',date,note,fromId:f.fromId,toId:f.toId}
     :Object.assign({type:f.type,amount,categoryId:f.categoryId,catName:catView(f.categoryId).name,date,note},f.accountId&&acctOf(f.accountId)?{accountId:f.accountId}:{});
+  if(!f.id&&f.repeat==='inst'){const n=parseInt($('#f-inst').value,10);if(!(n>=2&&n<=60)){toast('מספר תשלומים: 2 עד 60');focusEl($('#f-inst'),true);return;}}
   let prev=null,t;
-  if(f.id){
+  if(!f.id&&f.repeat!=='once'){/* נוצר בתוך saveRecurringNew */}
+  else if(f.id){
     const i=S.tx.transactions.findIndex(x=>x.id===f.id);if(i<0)return;
     prev=Object.assign({},S.tx.transactions[i]);
-    t=Object.assign({id:prev.id,createdAt:prev.createdAt},fields);
+    // שומרים את הקישור לתבנית (תנועה חוזרת / תשלום i מתוך n)
+    t=Object.assign({id:prev.id,createdAt:prev.createdAt},fields,prev.recId?{recId:prev.recId}:{},prev.inst?{inst:prev.inst}:{});
     S.tx.transactions[i]=t;
   }else{
     t=Object.assign({id:uid(),createdAt:Date.now()},fields);
     if(active)S.tx.transactions.push(t);
   }
   if(!xfer)setLastAcct(f.type,f.accountId);
+  if(!f.id&&f.repeat!=='once'){saveRecurringNew(f,fields,date);return;}
   const edited=!!f.id,tid=t.id;
   saveTxFx(t,prev);closeSheet();render();
   const undo=edited
@@ -1570,6 +1825,33 @@ function saveTx(){
       delTxFx(t);render();toast('ההוספה בוטלה');
     };
   toast(!active?'נשמר ב'+monthName(mk):edited?'השינויים נשמרו':xfer?'ההעברה נשמרה':(f.type==='income'?'ההכנסה נשמרה':'ההוצאה נשמרה'),'',undo);
+}
+
+/* תבנית חדשה (כל חודש / תשלומים). כל החודשים שהיום שלהם כבר הגיע נוצרים מיד, באותה שמירה
+   (תבנית חדשה עוד לא מוכרת למכשיר אחר, ולכן אין סכנת כפילות, וזה עובד גם בלי חיבור) */
+function saveRecurringNew(f,fields,date){
+  const mk=date.slice(0,7),inst=f.repeat==='inst',n=inst?parseInt($('#f-inst').value,10):0,cur=monthKey(new Date());
+  const {date:_d,...base}=fields;
+  const r=Object.assign({id:uid()},base,{day:+date.slice(8),startMonth:mk,lastMonth:null,paused:false,createdAt:Date.now()},
+    inst?{count:n,total:fields.amount}:{});
+  if(inst)r.amount=instAmount(r,2);
+  if(inst)r.paid=0;
+  const months=recDue(r),txs=months.map(m=>{const t=recTx(r,m);if(inst)r.paid=r2(r.paid+t.amount);return t;});
+  if(months.length)r.lastMonth=months[months.length-1];
+  const fx=mergeFx([].concat(...txs.map(txEffects)));
+  S.rec.push(r);
+  txs.forEach(t=>{if(wantedMonths().has(t.date.slice(0,7)))S.tx.transactions.push(t);});
+  applyFxLocal(fx);D.putRec(r,txs,fx);closeSheet();render();
+  // איפה זה נמצא: אחרת תשלום שהתחיל בחודש קודם "נעלם" מהמסך
+  const what=inst?'הראשון':'הראשונה';
+  let where='';
+  if(!txs.length)where=', '+what+' ב־'+dayShort(date);
+  else if(mk!==cur)where=', '+what+' ב'+monthName(mk)+(txs.length>1?' (נוצרו '+txs.length+')':'');
+  toast((inst?'נשמר ב־'+n+' תשלומים':'נשמרה כתנועה חוזרת')+where,'',()=>{
+    S.rec=S.rec.filter(x=>x.id!==r.id);
+    const ids=new Set(txs.map(t=>t.id));S.tx.transactions=S.tx.transactions.filter(x=>!ids.has(x.id));
+    const back=negFx(fx);applyFxLocal(back);D.undoRec(r.id,txs,back);render();toast('בוטל');
+  });
 }
 
 /* ================= sheets: assets & liabilities ================= */
@@ -1793,7 +2075,7 @@ async function doExport(){
   try{
     all=await Promise.race([D.allTx(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000))]);
   }catch(e){console.error(e);toast('אין חיבור לאינטרנט. נסו שוב'+errTag(e),'err');return;}
-  const data={app:'personal-finance-dashboard',version:2,exportedAt:new Date().toISOString(),tx:{categories:S.tx.categories,transactions:all},nw:S.nw};
+  const data={app:'personal-finance-dashboard',version:2,exportedAt:new Date().toISOString(),tx:{categories:S.tx.categories,transactions:all},nw:S.nw,rec:S.rec};
   const name='finance-backup-'+todayStr()+'.json';
   const file=new File([JSON.stringify(data,null,2)],name,{type:'application/json'});
   S.form={kind:'export',file};
@@ -1835,9 +2117,9 @@ function downloadExport(file,afterShareFail){
 const nkey=v=>String(v==null?'':v).trim().replace(/\s+/g,' ').toLowerCase();
 const txKey=t=>t.type+'|'+t.date+'|'+r2(+t.amount)+'|'+nkey(t.note);
 const histDay=t=>{const d=new Date(+t);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();};
-function planImport(bTx,bNw,cur){
-  const add={categories:[],transactions:[],assets:[],liabilities:[],history:[]};
-  const st={catsLinked:0,txSkip:0,itemsSkip:0,histSkip:0};
+function planImport(bTx,bNw,cur,bRec){
+  const add={categories:[],transactions:[],assets:[],liabilities:[],history:[],recurring:[]};
+  const st={catsLinked:0,txSkip:0,itemsSkip:0,histSkip:0,recSkip:0};
   // קטגוריות: לפי מזהה, אחר כך לפי סוג+שם
   const catIds=new Set(cur.cats.map(c=>c.id)),catByKey=new Map(cur.cats.map(c=>[c.type+'|'+nkey(c.name),c])),catMap=new Map();
   for(const c of bTx.categories){
@@ -1876,11 +2158,19 @@ function planImport(bTx,bNw,cur){
     if(ts.has(p.t)||dk.has(k)){st.histSkip++;continue;}
     add.history.push(p);ts.add(p.t);dk.add(k);
   }
-  const total=add.categories.length+add.transactions.length+add.assets.length+add.liabilities.length+add.history.length;
+  // תבניות חוזרות: לפי מזהה, אחר כך לפי סוג+סכום+יום+תיאור
+  const recKey=r=>r.type+'|'+r2(r.count?r.total:r.amount)+'|'+r.day+'|'+nkey(r.note);
+  const rIds=new Set((cur.rec||[]).map(r=>r.id)),rKeys=new Set((cur.rec||[]).map(recKey));
+  for(const r of (bRec||[])){
+    if(rIds.has(r.id)||rKeys.has(recKey(r))){st.recSkip++;continue;}
+    const cid=r.categoryId&&catMap.has(r.categoryId)?catMap.get(r.categoryId):null;
+    add.recurring.push(Object.assign({},r,{categoryId:cid}));rIds.add(r.id);rKeys.add(recKey(r));
+  }
+  const total=add.categories.length+add.transactions.length+add.assets.length+add.liabilities.length+add.history.length+add.recurring.length;
   return{add,st,total};
 }
 function isPristine(cur){
-  if(cur.tx.length||cur.assets.length||cur.liabs.length||cur.hist.length)return false;
+  if(cur.tx.length||cur.assets.length||cur.liabs.length||cur.hist.length||(cur.rec||[]).length)return false;
   if(cur.cats.length!==DEFAULT_CATS.length)return false;
   const def=new Set(DEFAULT_CATS.map(([name,icon,type])=>type+'|'+nkey(name)));
   return cur.cats.every(c=>def.has(c.type+'|'+nkey(c.name)));
@@ -1892,13 +2182,14 @@ function importSummary(plan){
   row('קטגוריות',a.categories.length,st.catsLinked);
   row('נכסים והתחייבויות',a.assets.length+a.liabilities.length,st.itemsSkip);
   row('נקודות בגרף',a.history.length,st.histSkip);
+  row('תנועות חוזרות',a.recurring.length,st.recSkip);
   return rows.join('');
 }
 async function runImport(plan){
   toast('מייבא…','busy');
   try{
     const a=plan.add;
-    await D.importAll({categories:a.categories,transactions:a.transactions},{assets:a.assets,liabilities:a.liabilities,history:a.history});
+    await D.importAll({categories:a.categories,transactions:a.transactions},{assets:a.assets,liabilities:a.liabilities,history:a.history},a.recurring);
     toast('נוספו '+F.n0.format(plan.total)+' פריטים מהגיבוי');
   }catch(e){console.error(e);toast('הייבוא לא הושלם. אפשר לייבא שוב, מה שכבר נוסף ידולג'+errTag(e),'err');}
 }
@@ -1912,8 +2203,8 @@ async function importFile(file){
   try{
     curTx=await Promise.race([D.allTx(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000))]);
   }catch(e){console.error(e);toast('הייבוא דורש חיבור לאינטרנט'+errTag(e),'err');return;}
-  const cur={cats:S.tx.categories,tx:curTx,assets:S.nw.assets,liabs:S.nw.liabilities,hist:S.nw.history};
-  const plan=planImport(bTx,bNw,cur);
+  const cur={cats:S.tx.categories,tx:curTx,assets:S.nw.assets,liabs:S.nw.liabilities,hist:S.nw.history,rec:S.rec};
+  const plan=planImport(bTx,bNw,cur,normRec(obj.rec));
   if(!plan.total){toast('כל מה שבגיבוי כבר קיים בחשבון');return;}
   // חשבון ריק (רק קטגוריות ברירת המחדל): אין מה לדרוס, מייבאים מיד
   if(isPristine(cur)){await runImport(plan);return;}
@@ -1948,6 +2239,7 @@ document.addEventListener('click',async e=>{
 
     case 'f-type':if(f&&f.type!==v){f.type=v;f.categoryId=null;if(!f.id&&v!=='transfer')f.accountId=lastAcct(v);syncTxType();}break;
     case 'f-acct':if(f){f.accountId=id||null;renderAcctChips();}break;
+    case 'f-rep':if(f){f.repeat=v;syncRep();if(v==='inst')focusEl($('#f-inst'),true);}break;
     case 'f-from':if(f){f.fromId=id;if(f.toId===id)f.toId=null;renderXferChips();}break;
     case 'f-to':if(f){f.toId=id;renderXferChips();}break;
     case 'f-cat':if(f){f.categoryId=id;renderCatChips();}break;
@@ -1968,6 +2260,22 @@ document.addEventListener('click',async e=>{
       break;
     }
     case 'undo':runUndo();break;
+    case 'rec-edit':openRecSheet(id);break;
+    case 'rec-save':saveRec();break;
+    case 'rec-pause':{
+      const r=f&&S.rec.find(x=>x.id===f.id);if(!r)break;
+      r.paused=!r.paused;D.updRec(r.id,{paused:r.paused});closeSheet();render();
+      toast(r.paused?'הושהה':'חודש','',()=>{r.paused=!r.paused;D.updRec(r.id,{paused:r.paused});render();});
+      if(!r.paused)setTimeout(genRecurring,0);
+      break;
+    }
+    case 'rec-del':{
+      const r=f&&S.rec.find(x=>x.id===f.id);if(!r)break;
+      const copy=Object.assign({},r);
+      S.rec=S.rec.filter(x=>x.id!==r.id);D.delRec(r.id);closeSheet();render();
+      toast('נמחק. תנועות שכבר נוצרו נשארות','',()=>{S.rec.push(copy);D.putRec(copy,null,[]);render();toast('הוחזר');});
+      break;
+    }
 
     case 'asset-add':openNwSheet('asset',null,v);break;
     case 'liab-add':openNwSheet('liab');break;
@@ -2059,9 +2367,9 @@ document.addEventListener('click',async e=>{
       let txIds;
       try{txIds=await D.txIds();}catch(err){console.error(err);toast('המחיקה דורשת חיבור לאינטרנט'+errTag(err),'err');break;}
       const old={cats:S.tx.categories.map(c=>c.id),txs:txIds,assets:S.nw.assets.map(x=>x.id),
-        liabs:S.nw.liabilities.map(x=>x.id),hist:S.nw.history.map(p=>String(p.t))};
+        liabs:S.nw.liabilities.map(x=>x.id),hist:S.nw.history.map(p=>String(p.t)),recs:S.rec.map(r=>r.id)};
       const cats=defaultCats();
-      S.tx={categories:cats,transactions:[]};S.nw={assets:[],liabilities:[],history:[]};
+      S.tx={categories:cats,transactions:[]};S.nw={assets:[],liabilities:[],history:[]};S.rec=[];
       S.txCat=null;
       D.wipe(old,cats);render();toast('כל הנתונים נמחקו');break;
     }
@@ -2070,6 +2378,7 @@ document.addEventListener('click',async e=>{
 document.addEventListener('input',e=>{
   const el=e.target;
   if(el.id==='f-amount'||el.id==='n-value')sizeAmount(el);
+  if(el.id==='f-amount'||el.id==='f-inst')syncRep();
   if(el.classList&&el.classList.contains('bulk-in'))bulkTotal();
   if(el.id==='tx-search'){S.txQ=el.value;updateTxResults();}
 });
@@ -2078,7 +2387,7 @@ document.addEventListener('focusin',e=>{
   if(el.classList&&el.classList.contains('bulk-in'))setTimeout(()=>{try{el.select();}catch(err){}},0);
 });
 document.addEventListener('change',e=>{
-  if(e.target.id==='f-date'&&S.form){S.form.date=e.target.value;syncDateChips();}
+  if(e.target.id==='f-date'&&S.form){S.form.date=e.target.value;syncDateChips();syncRep();}
   if(e.target.id==='file'){const fl=e.target.files&&e.target.files[0];e.target.value='';if(fl)importFile(fl);}
 });
 document.addEventListener('keydown',e=>{
@@ -2098,8 +2407,8 @@ document.addEventListener('keydown',e=>{
 if(window.visualViewport){window.visualViewport.addEventListener('resize',fitSheet);window.visualViewport.addEventListener('scroll',fitSheet);}
 let rz;
 window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(S.ready){const pts=rangePoints();$$('#view [data-chart]').forEach(el=>drawChart(el,pts));}},150);});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready)render();});
-window.addEventListener('online',()=>{syncUpdate();if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready)render();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready){render();genRecurring();}});
+window.addEventListener('online',()=>{syncUpdate();if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready){render();genRecurring();}});
 window.addEventListener('offline',()=>{syncUpdate();if(S.ready)render();});
 
 /* ================= boot ================= */
