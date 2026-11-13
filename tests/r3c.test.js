@@ -102,5 +102,23 @@ module.exports=async t=>{
   t.ok(A.sheetOpen()&&$('#sheet [data-a="signout"]'),'account opens as a sheet');
   click($('[data-a="sheet-close"]'));
   t.ok(!/גרסה חדשה/.test($('#view').textContent),'no "new version" notice by default');
+  // back gesture / back button returns from a settings page
+  A.set('rec');await sleep(20);
+  t.ok($('[data-a="set-back"]')&&A.w.history.state&&A.w.history.state.set==='rec','a settings page adds a history entry');
+  A.w.history.back();await sleep(60);
+  t.ok(!$('[data-a="set-back"]')&&$('[data-a="set"][data-v="rec"]'),'"back" (swipe) returns to the settings menu');
+  t.ok(/זמני פתיחה/.test($('.foot').textContent),'beta shows the startup timings');
+
+  // ---- filter by account in the transactions screen ----
+  A.tab('tx');await sleep(20);
+  await A.fake.fs.setDoc({path:P_BETA+'tx/acc1'},{type:'expense',amount:77,categoryId:'a',catName:'',date:D1,note:'מהעוש',createdAt:99,accountId:'c1'});await sleep(40);
+  const rows=()=>$$('#tx-results .tx-row').length,all=rows();
+  click($('[data-a="tx-acct"]'));await sleep(10);
+  t.ok(A.sheetOpen()&&$$('#sheet [data-a="tx-acct-pick"]').length===4,'"חשבון" opens a list of the accounts');
+  click($('#sheet [data-a="tx-acct-pick"][data-id="c1"]'));await sleep(20);
+  t.ok(!A.sheetOpen()&&rows()<all&&rows()>=1&&$$('#tx-results .tx-row').every(r=>/עו"ש/.test(r.textContent)||r.dataset.id==='acc1'),'only the transactions of that account are listed');
+  t.ok(/יתרה ב/.test($('.filter-sum').textContent)&&!$('.brk-mini'),'shows the account balance, hides the breakdown');
+  click($('[data-a="tx-acct-clear"]'));await sleep(20);
+  t.ok(rows()===all,'tapping the chip again clears the filter');
   t.ok(!A.errors.length,'no script errors'+(A.errors.length?': '+A.errors[0]:''));
 };
