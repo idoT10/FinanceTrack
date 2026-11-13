@@ -483,7 +483,7 @@ const S={
   nw:{assets:[],liabilities:[],history:[]},
   rec:[],
   view:'home',month:monthKey(new Date()),txType:'all',txCat:null,txAcct:null,txQ:'',range:'all',
-  catTab:'expense',histOpen:false,brkOpen:false,setPage:null,newVer:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
+  catTab:'expense',histOpen:false,brkOpen:false,setPage:null,newVer:false,live:false,early:false,earlyWrites:0,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
 };
 
 /* ================= storage ================= */
@@ -547,7 +547,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.6',APP_BUILD='b3',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.6',APP_BUILD='b4',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
@@ -577,10 +577,45 @@ const T0=typeof performance!=='undefined'?performance.now():0,TIMES={};   // ז�
 function mark(k){if(TIMES[k]===undefined&&typeof performance!=='undefined')TIMES[k]=Math.round(performance.now()-T0);}
 const SKEL='<div class="skel" style="height:150px"></div><div class="skel" style="height:260px;border-radius:26px"></div>';
 
+/* ---------- תמונת מצב שמורה: מה שהמסך צריך, נשמר בטלפון (לפי סביבה ומשתמש) ----------
+   ההתחברות מאמתת את המשתמש מול הרשת בכל פתיחה (שנייה וחצי עד שתיים בטלפון), ועד אז גם הנתונים השמורים של Firestore
+   לא מגיעים. לכן בפתיחה מציגים מיד מהתמונה השמורה, מתחילים את המאזינים עם המשתמש השמור, והנתונים האמיתיים מחליפים אותה. */
+const SNAP_KEY='fin-snap-'+ENV;
+let snapT=0;
+function saveSnapSoon(){
+  if(!S.live||!S.user||S.noAccess)return;
+  clearTimeout(snapT);
+  snapT=setTimeout(()=>{
+    if(!S.live||!S.user||S.noAccess)return;
+    try{
+      const cur=monthKey(new Date()),keep=new Set(TXS.src.recent?TXS.src.recent.keys():[]);
+      localStorage.setItem(SNAP_KEY,JSON.stringify({v:1,uid:S.user.uid,email:S.user.email||'',t:Date.now(),
+        cats:S.tx.categories,tx:S.tx.transactions.filter(t=>t.date.slice(0,7)===cur||keep.has(t.id)),
+        assets:S.nw.assets,liabs:S.nw.liabilities,hist:S.nw.history,rec:S.rec}));
+    }catch(e){console.warn(e);}
+  },800);
+}
+function loadSnap(){
+  try{const o=JSON.parse(localStorage.getItem(SNAP_KEY)||'null');return o&&o.v===1&&o.uid&&Array.isArray(o.tx)?o:null;}catch(e){return null;}
+}
+function clearSnap(){clearTimeout(snapT);try{localStorage.removeItem(SNAP_KEY);}catch(e){}}
+/* פתיחה מהתמונה השמורה: המאזינים כבר רצים (enter), והמסך מצויר מיד */
+function enterEarly(snap){
+  S.early=true;S.earlyWrites=0;
+  enter({uid:snap.uid,email:snap.email,emailVerified:true});
+  S.tx.categories=normTx({categories:snap.cats}).categories.sort((x,y)=>x.ord-y.ord);
+  txSource('snap',snap.tx);   // מקור זמני, עד שהתנועות האמיתיות מגיעות
+  S.nw=normNw({assets:snap.assets,liabilities:snap.liabs,history:snap.hist});
+  S.rec=normRec(snap.rec);
+  S.monthLoaded[monthKey(new Date())]=true;
+  S.ready=true;mark('view');render();
+  if(S.quick){S.quick=false;openTxSheet();}
+}
+
 function markLoaded(k){
   S.loaded[k]=true;
-  const first=!S.ready&&LOAD_KEYS.every(x=>S.loaded[x]);
-  if(first){mark('data');S.ready=true;try{ensureMonthlyPoint();}catch(e){console.error(e);}setTimeout(async()=>{await backfillPaid();genRecurring();},0);}
+  const first=!S.live&&LOAD_KEYS.every(x=>S.loaded[x]);
+  if(first){mark('data');mark('view');S.live=true;S.ready=true;if(TXS.src.snap){delete TXS.src.snap;txRebuild();}try{ensureMonthlyPoint();}catch(e){console.error(e);}setTimeout(async()=>{await backfillPaid();genRecurring();},0);}
   if(S.ready)render();
   if(first&&S.quick){S.quick=false;openTxSheet();}
   if(first)checkNewVersion();
@@ -640,10 +675,11 @@ const D={
   ref(n,id){return this.F.doc(this.db,...this.envRoot(ENV),n,id);},
   fail(e){
     console.error(e);
+    if(!S.user)return;   // כבר לא מחוברים (למשל ההתחברות השמורה פגה): מסך הכניסה כבר מוצג
     if(e&&e.code==='permission-denied'){showNoAccess();return;}
     toast('השמירה נכשלה – נסה שוב'+errTag(e),'err');
   },
-  w(p){syncBegin();p.catch(e=>this.fail(e)).finally(syncEnd);},
+  w(p){if(S.early)S.earlyWrites++;syncBegin();p.catch(e=>this.fail(e)).finally(syncEnd);},
   listen(name,apply){
     this.unsubs.push(this.F.onSnapshot(this.col(name),snap=>{
       apply(snap.docs.map(d=>Object.assign({id:d.id},d.data())));
@@ -965,7 +1001,7 @@ function showVerify(user){
 }
 function showNoAccess(){
   if(S.noAccess)return;
-  S.noAccess=true;
+  S.noAccess=true;clearSnap();
   D.stop();
   const u=S.user;
   gate('<h1>אין גישה עדיין</h1><p class="muted">החשבון <span class="num">'+esc(u&&u.email||'')+'</span> עדיין לא אושר לשימוש באפליקציה. אפשר לבקש מבעל האפליקציה להוסיף את האימייל, ואז ללחוץ "בדיקה מחדש".</p>'+
@@ -975,7 +1011,7 @@ function showNoAccess(){
   $('#g-out').onclick=()=>D.signOut();
 }
 function enter(user){
-  S.user=user;S.noAccess=false;S.ready=false;S.loaded={};S.view='home';
+  S.user=user;S.noAccess=false;S.ready=false;S.live=false;S.loaded={};S.view='home';S.setPage=null;
   S.tx={categories:[],transactions:[]};S.nw={assets:[],liabilities:[],history:[]};
   ungate();
   $('#view').innerHTML=SKEL;
@@ -1101,7 +1137,7 @@ async function backfillPaid(){
 /* יוצרת את התנועות שהגיע זמנן. כל חודש בפעולה אטומית מול השרת (רק עם חיבור), כך ששני מכשירים לא ייצרו פעמיים */
 let recBusy=false;
 async function genRecurring(){
-  if(recBusy||!S.ready||!S.rec.length||navigator.onLine===false)return;
+  if(recBusy||!S.live||!S.rec.length||navigator.onLine===false)return;
   recBusy=true;let n=0;
   try{
     for(const r of S.rec.slice()){
@@ -1696,7 +1732,7 @@ function viewSettings(){
       (ENV==='beta'?setRow('beta','🧪','#D9822B','סביבת בדיקה','העתקת הנתונים האמיתיים וניקוי'):'')+
       setRow('','🗑️','#C83E52','מחיקת כל הנתונים','','reset')+'</div>'+
     '<p class="foot">'+(S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות, '+S.nw.history.length+' נקודות בגרף<br>גרסה '+VERSION_LABEL+(ENV==='beta'?' · סביבת בדיקה':'')+
-    (ENV==='beta'&&TIMES.data!==undefined?'<br>זמני פתיחה (מילישניות מתחילת הטעינה): ספרייה '+TIMES.lib+' · התחברות '+TIMES.auth+' · נתונים '+TIMES.data:'')+'</p>';
+    (ENV==='beta'&&TIMES.data!==undefined?'<br>זמני פתיחה (מילישניות מתחילת הטעינה): ספרייה '+TIMES.lib+' · מסך '+TIMES.view+' · התחברות '+TIMES.auth+' · נתונים '+TIMES.data:'')+'</p>';
 }
 function catsSection(){
   const type=S.catTab,cats=S.tx.categories.filter(c=>c.type===type);
@@ -1725,7 +1761,7 @@ function openSetSheet(v){
 
 function render(){
   if(!S.ready)return;
-  syncMonths();
+  syncMonths();saveSnapSoon();
   const views={home:viewHome,tx:viewTx,nw:viewNw,settings:viewSettings};
   // עדכון מהסנכרון בזמן הקלדה בחיפוש: מחזירים את הפוקוס והסמן, כדי שהמקלדת לא תיסגר
   const ae=document.activeElement,keepQ=ae&&ae.id==='tx-search'?[ae.selectionStart,ae.selectionEnd]:null;
@@ -2557,10 +2593,23 @@ function wantsQuickAdd(){
     $('#view').innerHTML='<div class="surface empty">לא ניתן לטעון את האפליקציה. בדקו את החיבור לאינטרנט ורעננו.</div>';
     return;
   }
+  const snap=loadSnap();
+  if(snap)enterEarly(snap);
   D.onAuth(user=>{
     mark('auth');
+    let lost=false;
+    if(S.early){
+      S.early=false;
+      // אותו משתמש כמו בתמונה השמורה: המאזינים כבר רצים, ממשיכים בלי להתחיל מחדש
+      if(user&&user.uid===snap.uid&&user.emailVerified&&!S.noAccess){S.user=user;return;}
+      lost=S.earlyWrites>0;closeSheet();
+    }
     D.stop();
-    if(!user){S.user=null;S.ready=false;S.noAccess=false;showAuth('in');return;}
+    if(!user){
+      S.user=null;S.ready=false;S.live=false;S.noAccess=false;clearSnap();showAuth('in');
+      if(lost)gateSay('ההתחברות פגה, וצריך להיכנס מחדש. מה שנוסף בשניות האחרונות לא נשמר.');
+      return;
+    }
     S.user=user;
     if(!user.emailVerified){showVerify(user);return;}
     enter(user);
