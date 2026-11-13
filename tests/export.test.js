@@ -7,7 +7,7 @@ module.exports=async t=>{
   const A=openApp(sh,{beforeParse(w){w.navigator.canShare=()=>true;
     w.navigator.share=d=>{shares.push({sync:w.__inClick,name:d.files[0].name});return w.__inClick?Promise.resolve():Promise.reject(Object.assign(new Error('NotAllowed'),{name:'NotAllowedError'}));};}});
   await sleep(150);A.tab('settings');
-  A.click(A.$$('[data-a="bk"]')[0]);
+  A.set('bk');A.click(A.$$('[data-a=\"bk\"]')[0]);
   t.ok(shares.length===0,'share is not called after waiting for the server');
   await sleep(200);
   t.ok(A.sheetOpen()&&/הגיבוי מוכן/.test(A.$('#sheet').textContent),'sheet "הגיבוי מוכן"');
@@ -17,6 +17,6 @@ module.exports=async t=>{
   await sleep(30);
   t.ok(!A.sheetOpen()&&/הגיבוי נשמר/.test(A.toast()),'toast "הגיבוי נשמר"');
   A.fake.fs.getDocsFromServer=async()=>{throw new Error('offline');};
-  A.click(A.$$('[data-a="bk"]')[0]);await sleep(100);
+  A.set('bk');A.click(A.$$('[data-a=\"bk\"]')[0]);await sleep(100);
   t.ok(/אין חיבור לאינטרנט/.test(A.toast())&&!A.sheetOpen(),'offline: clear message, no sheet');
 };

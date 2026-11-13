@@ -230,6 +230,13 @@ textarea.input{min-height:130px;direction:ltr;text-align:left;resize:vertical;fo
 .sw{width:34px;height:34px;border-radius:50%;background:var(--c)}
 .sw.on{box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--c)}
 .sheet-actions{display:flex;gap:10px;margin-top:22px}
+/* כפתורי הפעולה צמודים לתחתית החלון, כדי שהשמירה תמיד נראית (גם כשהתוכן ארוך וגם מעל המקלדת) */
+.sheet .sheet-actions{position:sticky;bottom:calc(-18px - var(--safe-b));margin:14px -18px calc(-18px - var(--safe-b));padding:12px 18px calc(18px + var(--safe-b));background:var(--surface);border-top:1px solid var(--line);z-index:2}
+.neg-btn{width:38px;height:38px;border-radius:10px;background:var(--sunk);font-weight:700;font-size:17px;display:grid;place-items:center;flex:none;color:var(--ink-2)}
+.neg-btn.on{background:color-mix(in srgb,var(--expense) 16%,var(--surface));color:var(--expense)}
+.brk-mini{display:block;width:100%;text-align:start}
+.brk-mini .stack{margin:0 0 10px}
+.brk-mini .legend{margin:0}
 .bk-panel{margin-top:12px;display:flex;flex-direction:column;gap:10px}
 .foot{font-size:12.5px;color:var(--ink-3);text-align:center;margin:20px 8px}
 .banner{background:#FDF1D8;color:#6A4A06;border-radius:14px;padding:11px 14px;font-size:13.5px;margin-bottom:14px}
@@ -473,7 +480,7 @@ const S={
   nw:{assets:[],liabilities:[],history:[]},
   rec:[],
   view:'home',month:monthKey(new Date()),txType:'all',txCat:null,txQ:'',range:'all',
-  catTab:'expense',histOpen:false,brkOpen:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
+  catTab:'expense',histOpen:false,brkOpen:false,setPage:null,newVer:false,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
 };
 
 /* ================= storage ================= */
@@ -537,7 +544,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.6',APP_BUILD='b1',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.6',APP_BUILD='b2',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
@@ -571,6 +578,7 @@ function markLoaded(k){
   if(first){S.ready=true;try{ensureMonthlyPoint();}catch(e){console.error(e);}setTimeout(async()=>{await backfillPaid();genRecurring();},0);}
   if(S.ready)render();
   if(first&&S.quick){S.quick=false;openTxSheet();}
+  if(first)checkNewVersion();
 }
 
 
@@ -1371,6 +1379,7 @@ function drawChart(el,pts){
 
 /* ================= views ================= */
 function bannerHtml(){
+  if(S.newVer)return '<div class="banner row between" style="gap:10px"><span>יש גרסה חדשה של האפליקציה.</span><button class="link" style="color:inherit;text-decoration:underline;padding:0" data-a="reload">רענון</button></div>';
   if(typeof navigator!=='undefined'&&navigator.onLine===false)return '<div class="banner">אין חיבור לאינטרנט. השינויים יישלחו כשהחיבור יחזור.</div>';
   return '';
 }
@@ -1485,9 +1494,14 @@ function txResults(){
     for(const t of monthTx)if(t.type===btype){const k=catKey(t);bs[k]=(bs[k]||0)+t.amount;}
     const bids=Object.keys(bs).sort((a,b)=>bs[b]-bs[a]);
     if(bids.length>1){
-      h+='<div class="sec-h"><h3>'+(btype==='income'?'פילוח הכנסות':'פילוח הוצאות')+'</h3></div><div class="surface">'+
-        (S.brkOpen?bids:bids.slice(0,3)).map(id=>barRow(id,bs[id],btype==='income'?tot.inc:tot.exp,'tx-cat')).join('')+
-        (bids.length>3?'<button class="add-row" data-a="brk-toggle">'+(S.brkOpen?'הצגת פחות':'הצגת כל '+bids.length+' הקטגוריות')+'</button>':'')+'</div>';
+      // סגור: פס צבעים אחד ושלוש הגדולות. פתוח: שורה לכל קטגוריה (לחיצה על שורה מסננת)
+      const total=btype==='income'?tot.inc:tot.exp;
+      h+='<div class="sec-h"><h3>'+(btype==='income'?'פילוח הכנסות':'פילוח הוצאות')+'</h3><button class="link" data-a="brk-toggle">'+(S.brkOpen?'הסתרה':'פירוט')+'</button></div>';
+      h+=S.brkOpen
+        ?'<div class="surface">'+bids.map(id=>barRow(id,bs[id],total,'tx-cat')).join('')+'</div>'
+        :'<button class="surface brk-mini" data-a="brk-toggle" aria-label="הצגת הפילוח המלא"><span class="stack">'+bids.map(id=>'<i style="flex-grow:'+bs[id]+';background:'+catView(id).color+'"></i>').join('')+'</span>'+
+          '<span class="legend">'+bids.slice(0,3).map(id=>{const c=catView(id);return '<span><i style="background:'+c.color+'"></i>'+esc(c.name)+' <span class="num">'+pct(bs[id],total)+'%</span></span>';}).join('')+
+          (bids.length>3?'<span>ועוד '+(bids.length-3)+'</span>':'')+'</span></button>';
     }
   }
 
@@ -1599,7 +1613,7 @@ function recSection(){
   const mon=t=>r2(act.filter(r=>r.type===t).reduce((s,r)=>s+r.amount,0));
   const exp=mon('expense'),inc=mon('income'),com=committedInst();
   const list=S.rec.slice().sort((a,b)=>(recDone(a)-recDone(b))||(a.paused-b.paused)||(a.day-b.day));
-  let h='<div class="sec-h"><h3>תנועות חוזרות ותשלומים</h3></div>';
+  let h='';   // הכותרת היא כותרת הדף (render)
   if(!list.length)return h+'<div class="surface empty">שכירות, משכורת, מנויים או קנייה בתשלומים. מוסיפים מחלון ההוספה: "כל חודש" או "בתשלומים".</div>';
   h+='<div class="surface list">'+
     ((exp||inc||com)?'<p class="muted small" style="padding:10px 2px 4px">'+[exp?'הוצאות קבועות בחודש: <b>'+money(exp)+'</b>':'',inc?'הכנסות קבועות: <b>'+money(inc)+'</b>':'',com?'נשאר לשלם בתשלומים: <b>'+money(com)+'</b>':''].filter(Boolean).join(' · ')+'</p>':'')+
@@ -1639,39 +1653,55 @@ function saveRec(){
     D.updRec(r.id,back);render();toast('השינויים בוטלו');
   });
 }
+/* מסך ההגדרות: תפריט של שורות. "תנועות חוזרות" ו"קטגוריות" נפתחות כדף (S.setPage), השאר כחלון */
+function setRow(v,icon,color,title,sub,act){
+  return '<button class="tx-row" data-a="'+(act||'set')+'" data-v="'+v+'"><span class="ic" style="--c:'+color+'">'+icon+'</span><span class="tx-main"><span class="tx-title">'+title+'</span>'+
+    (sub?'<span class="tx-sub">'+sub+'</span>':'')+'</span><span class="muted">'+ICON.chevL+'</span></button>';
+}
+const THEME_NAMES={auto:'אוטומטי',light:'בהיר',dark:'כהה'};
 function viewSettings(){
-  const type=S.catTab,cats=S.tx.categories.filter(c=>c.type===type);
+  const back='<button class="link row" style="gap:2px;margin:-6px -6px 10px" data-a="set-back">'+ICON.chevR+'הגדרות</button>';
+  if(S.setPage==='rec')return back+recSection();
+  if(S.setPage==='cats')return back+catsSection();
+  const act=S.rec.filter(r=>!r.paused&&!recDone(r)).length;
+  const nExp=S.tx.categories.filter(c=>c.type==='expense').length,nInc=S.tx.categories.length-nExp;
   const email=S.user&&S.user.email?S.user.email:'';
-  let h='';
-  if(ENV==='beta'){
-    h+='<div class="sec-h" style="margin-top:4px"><h3>סביבת בדיקה</h3></div><div class="surface beta-tools">'+
-      '<p class="muted small">הנתונים כאן נפרדים מהנתונים האמיתיים. ההעתקה קוראת את הנתונים האמיתיים ולא משנה אותם.</p>'+
-      '<button class="btn ghost full" style="margin-top:12px" data-a="beta-copy">העתקת הנתונים האמיתיים לבדיקה</button>'+
-      '<button class="btn danger ghost full" style="margin-top:10px" data-a="beta-wipe">ניקוי נתוני הבדיקה</button></div>';
-  }
-  h+='<div class="sec-h"'+(ENV==='beta'?'':' style="margin-top:4px"')+'><h3>חשבון</h3></div>'+
-    '<div class="surface"><div class="row between" style="gap:12px"><span class="muted small">מחובר כ־</span><span class="num small">'+esc(email)+'</span></div>'+
-    '<button class="btn ghost full" style="margin-top:12px" data-a="signout">יציאה מהחשבון</button></div>';
-  const th=getTheme();
-  h+='<div class="sec-h"><h3>מראה</h3></div><div class="seg">'+[['auto','אוטומטי'],['light','בהיר'],['dark','כהה']].map(([v,l])=>
-    '<button data-a="theme" data-v="'+v+'" class="'+(th===v?'on':'')+'">'+l+'</button>').join('')+'</div>'+
-    '<p class="hint" style="margin:8px 2px 0">"אוטומטי" לפי הגדרת הטלפון. הבחירה חלה על המכשיר הזה בלבד.</p>';
-  h+=recSection();
-  h+='<div class="sec-h"><h3>קטגוריות</h3></div>';
-  h+='<div class="seg" style="margin-bottom:10px"><button data-a="cat-tab" data-v="expense" class="'+(type==='expense'?'on exp':'')+'">הוצאות</button><button data-a="cat-tab" data-v="income" class="'+(type==='income'?'on inc':'')+'">הכנסות</button></div>';
-  h+='<div class="surface list">'+(cats.length?cats.map(c=>
+  return '<div class="surface list" style="margin-top:4px">'+
+      setRow('rec','🔁','#3F6FB5','תנועות חוזרות ותשלומים',S.rec.length?(act===1?'אחת פעילה':act+' פעילות'):'שכירות, משכורת, מנויים, תשלומים')+
+      setRow('cats','🏷️','#B3568A','קטגוריות',nExp+' הוצאות · '+nInc+' הכנסות')+'</div>'+
+    '<div class="surface list">'+
+      setRow('theme','🌗','#7153A8','מראה',THEME_NAMES[getTheme()])+
+      setRow('stats','📊','#2A98A8','סטטיסטיקות','כמה תנועות בכל קטגוריה')+
+      setRow('bk','💾','#4E9A5F','גיבוי ושחזור','ייצוא וייבוא מקובץ')+'</div>'+
+    '<div class="surface list">'+
+      setRow('acct','👤','#7C8580','חשבון','<span class="num">'+esc(email)+'</span>')+
+      (ENV==='beta'?setRow('beta','🧪','#D9822B','סביבת בדיקה','העתקת הנתונים האמיתיים וניקוי'):'')+
+      setRow('','🗑️','#C83E52','מחיקת כל הנתונים','','reset')+'</div>'+
+    '<p class="foot">'+(S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות, '+S.nw.history.length+' נקודות בגרף<br>גרסה '+VERSION_LABEL+(ENV==='beta'?' · סביבת בדיקה':'')+'</p>';
+}
+function catsSection(){
+  const type=S.catTab,cats=S.tx.categories.filter(c=>c.type===type);
+  return '<div class="seg" style="margin-bottom:10px"><button data-a="cat-tab" data-v="expense" class="'+(type==='expense'?'on exp':'')+'">הוצאות</button><button data-a="cat-tab" data-v="income" class="'+(type==='income'?'on inc':'')+'">הכנסות</button></div>'+
+    '<div class="surface list">'+(cats.length?cats.map(c=>
     '<button class="tx-row" data-a="cat-edit" data-id="'+esc(c.id)+'"><span class="ic" style="--c:'+c.color+'">'+esc(c.icon)+'</span><span class="tx-main"><span class="tx-title">'+esc(c.name)+'</span></span><span class="muted">'+ICON.chevL+'</span></button>'
   ).join(''):'<div class="empty">אין עדיין קטגוריות '+(type==='expense'?'הוצאה':'הכנסה')+'.</div>')+
     '<button class="add-row" data-a="cat-add">＋ קטגוריה חדשה</button></div>';
-
-  h+='<div class="sec-h"><h3>סטטיסטיקות</h3></div><div class="surface"><p class="muted small">כמה תנועות יש בכל קטגוריה, מכל התקופות.</p>'+
-    '<button class="btn ghost full" style="margin-top:12px" data-a="stats">הצגת סטטיסטיקות</button></div>';
-  h+='<div class="sec-h"><h3>גיבוי ושחזור</h3></div><div class="surface"><p class="muted small">שמרו עותק של כל הנתונים בקובץ, ושחזרו ממנו מתי שצריך.</p>'+
-    '<div class="row" style="gap:10px;margin-top:12px"><button class="btn ghost grow" data-a="bk" data-v="export">ייצוא גיבוי</button><button class="btn ghost grow" data-a="bk" data-v="import">ייבוא מקובץ</button></div></div>';
-  h+='<div class="sec-h"><h3>מחיקת נתונים</h3></div><div class="surface"><button class="btn danger ghost full" data-a="reset">מחיקת כל הנתונים</button></div>';
-  h+='<p class="foot">'+
-    (S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות, '+S.nw.history.length+' נקודות בגרף<br>גרסה '+VERSION_LABEL+(ENV==='beta'?' · סביבת בדיקה':'')+'</p>';
-  return h;
+}
+function themeSeg(){
+  const th=getTheme();
+  return [['auto','אוטומטי'],['light','בהיר'],['dark','כהה']].map(([v,l])=>'<button data-a="theme" data-v="'+v+'" class="'+(th===v?'on':'')+'">'+l+'</button>').join('');
+}
+function openSetSheet(v){
+  S.form={kind:'menu',v};
+  const email=S.user&&S.user.email?S.user.email:'';
+  if(v==='theme')openSheet(sheetHead('מראה')+'<div class="seg" id="th-seg">'+themeSeg()+'</div>'+
+    '<p class="hint" style="margin:10px 2px 6px">"אוטומטי" לפי הגדרת הטלפון. הבחירה חלה על המכשיר הזה בלבד.</p>');
+  else if(v==='bk')openSheet(sheetHead('גיבוי ושחזור')+'<p class="muted" style="line-height:1.6">שמרו עותק של כל הנתונים בקובץ, ושחזרו ממנו מתי שצריך.</p>'+
+    '<div class="bk-panel"><button class="btn ghost full" data-a="bk" data-v="export">ייצוא גיבוי</button><button class="btn ghost full" data-a="bk" data-v="import">ייבוא מקובץ</button></div>');
+  else if(v==='acct')openSheet(sheetHead('חשבון')+'<div class="row between" style="gap:12px;margin-top:6px"><span class="muted">מחובר כ־</span><span class="num">'+esc(email)+'</span></div>'+
+    '<div class="bk-panel"><button class="btn ghost full" data-a="signout">יציאה מהחשבון</button></div>');
+  else if(v==='beta'&&ENV==='beta')openSheet(sheetHead('סביבת בדיקה')+'<p class="muted" style="line-height:1.6">הנתונים כאן נפרדים מהנתונים האמיתיים. ההעתקה קוראת את הנתונים האמיתיים ולא משנה אותם.</p>'+
+    '<div class="bk-panel beta-tools"><button class="btn ghost full" data-a="beta-copy">העתקת הנתונים האמיתיים לבדיקה</button><button class="btn danger ghost full" data-a="beta-wipe">ניקוי נתוני הבדיקה</button></div>');
 }
 
 function render(){
@@ -1682,7 +1712,7 @@ function render(){
   const ae=document.activeElement,keepQ=ae&&ae.id==='tx-search'?[ae.selectionStart,ae.selectionEnd]:null;
   $('#view').innerHTML=bannerHtml()+views[S.view]();
   if(keepQ){const i=$('#tx-search');if(i){try{i.focus({preventScroll:true});i.setSelectionRange(keepQ[0],keepQ[1]);}catch(err){}}}
-  $('#top-title').textContent=TITLES[S.view];
+  $('#top-title').textContent=S.view==='settings'&&S.setPage?{rec:'תנועות חוזרות',cats:'קטגוריות'}[S.setPage]:TITLES[S.view];
   $('#top-sub').textContent=S.view==='home'?F.dayLong.format(new Date()):'\u00a0';
   $$('.tab').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
   const pts=rangePoints();
@@ -1891,6 +1921,7 @@ function openNwSheet(kind,id,preset){
   const html=sheetHead(title)+
     '<div class="field-label" style="margin-top:4px" id="n-value-label"></div>'+
     '<label class="amount-wrap"><span class="cur">₪</span><input id="n-value" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" value="'+(x?x.value:'')+'" data-orig="'+(x?x.value:'')+'"></label>'+
+    '<div style="text-align:center" id="n-neg-wrap" hidden><button class="chip" id="n-neg" data-a="n-neg">החשבון במינוס</button></div>'+
     '<p class="hint" style="text-align:center" id="n-hint"></p>'+
     '<div class="field-label">סוג</div><div class="chips wrap" id="n-cats">'+cats.map(c=>
       '<button class="chip '+(c.id===S.form.category?'on':'')+'" style="--c:'+c.color+'" data-a="f-acat" data-v="'+c.id+'">'+c.icon+' '+c.name+'</button>').join('')+'</div>'+
@@ -1904,8 +1935,10 @@ function syncNwLabels(){
   const f=S.form;if(!f||f.kind!=='nw')return;
   const g=acctGroup(f.nk,f.category),x=f.id?(f.nk==='asset'?S.nw.assets:S.nw.liabilities).find(i=>i.id===f.id):null;
   $('#n-value-label').textContent=g==='live'?(f.nk==='liab'?'החוב הנוכחי בכרטיס':(x?'יתרה נוכחית':'יתרת פתיחה')):(f.nk==='asset'?'שווי נוכחי':'יתרה לסילוק');
+  // במקלדת המספרים של האייפון אין מקש מינוס, ולכן כפתור
+  const ng=$('#n-neg-wrap');if(ng){ng.hidden=!(g==='live'&&f.nk==='asset');$('#n-neg').classList.toggle('on',/^\s*[-−]/.test($('#n-value').value));}
   $('#n-hint').textContent=g==='live'
-    ?(x?'היתרה מתעדכנת לבד מהתנועות. שינוי כאן נשמר כהתאמת יתרה ומופיע ברשימת התנועות.':'מכאן והלאה היתרה תתעדכן לבד מההוצאות, ההכנסות וההעברות.'+(f.nk==='asset'?' אפשר גם יתרה שלילית (מינוס).':''))
+    ?(x?'היתרה מתעדכנת לבד מהתנועות. שינוי כאן נשמר כהתאמת יתרה ומופיע ברשימת התנועות.':'מכאן והלאה היתרה תתעדכן לבד מההוצאות, ההכנסות וההעברות.'+'')
     :(x?'עודכן '+relDay(x.updatedAt)+'. שמירה של סכום חדש מוסיפה נקודה לגרף.':'');
 }
 /* רשומת עדכון/התאמה לכל שינוי ידני בערך של חשבון (תשתית ליתרה היסטורית ולתשואה) */
@@ -1974,7 +2007,9 @@ function saveCat(){
 
 /* ================= sheet: עדכון מלא ================= */
 function bulkRow(kind,x,c){
+  const neg=kind==='asset'&&acctGroup(kind,x.category)==='live';   // עו"ש ומזומן יכולים להיות במינוס
   return '<label class="bulk-row"><span class="ic sm" style="--c:'+c.color+'">'+c.icon+'</span><span class="bulk-name">'+esc(x.name)+'</span>'+
+    (neg?'<button class="neg-btn'+(x.value<0?' on':'')+'" data-a="b-neg" data-id="'+esc(x.id)+'" aria-label="החלפה בין פלוס למינוס">±</button>':'')+
     '<input class="bulk-in" inputmode="decimal" enterkeyhint="next" autocomplete="off" data-kind="'+kind+'" data-id="'+esc(x.id)+'" value="'+x.value+'" data-orig="'+x.value+'" aria-label="'+esc(x.name)+'"></label>';
 }
 function bulkRows(kind,list,cats){
@@ -2252,7 +2287,15 @@ document.addEventListener('click',async e=>{
   if(!b||b.closest('#dialog'))return;
   const a=b.dataset.a,v=b.dataset.v,id=b.dataset.id,f=S.form;
   switch(a){
-    case 'nav':S.view=v;render();window.scrollTo(0,0);break;
+    case 'nav':S.view=v;S.setPage=null;render();window.scrollTo(0,0);break;
+    case 'set':
+      if(v==='rec'||v==='cats'){S.setPage=v;render();window.scrollTo(0,0);}
+      else if(v==='stats')openStatsSheet();else openSetSheet(v);
+      break;
+    case 'set-back':S.setPage=null;render();window.scrollTo(0,0);break;
+    case 'reload':location.reload();break;
+    case 'n-neg':{const i=$('#n-value');if(i){i.value=/^\s*[-−]/.test(i.value)?i.value.replace(/^\s*[-−]/,''):'-'+i.value;sizeAmount(i);syncNwLabels();focusEl(i);}break;}
+    case 'b-neg':{const i=$$('#sheet .bulk-in').find(x=>x.dataset.id===id);if(i){i.value=/^\s*[-−]/.test(i.value)?i.value.replace(/^\s*[-−]/,''):'-'+i.value;b.classList.toggle('on',i.value.startsWith('-'));bulkTotal();}break;}
     case 'fab':openTxSheet();break;
     case 'go':
       if(S.view!=='tx')S.month=monthKey(new Date());
@@ -2365,14 +2408,15 @@ document.addEventListener('click',async e=>{
       break;
     }
 
-    case 'bk':if(v==='export')doExport();else $('#file').click();break;
+    case 'bk':closeSheet();if(v==='export')doExport();else $('#file').click();break;
     case 'bk-save':saveExport();break;
     case 'import-go':{if(!f||f.kind!=='import')break;const plan=f.plan;closeSheet();await runImport(plan);break;}
     case 'stats':openStatsSheet();break;
-    case 'theme':setTheme(v);render();break;
+    case 'theme':{setTheme(v);render();const sg=$('#th-seg');if(sg)sg.innerHTML=themeSeg();break;}
     case 'sync-retry':if(SYNC.n>0){toast('מתחבר מחדש…');D.reconnect();}break;
     case 'beta-copy':{
       if(ENV!=='beta')break;
+      closeSheet();
       if(!await askConfirm('להחליף את נתוני הבדיקה בעותק של הנתונים האמיתיים? הנתונים האמיתיים לא ישתנו.',{ok:'העתקה'}))break;
       toast('מעתיק…','busy');
       try{const n=await D.betaCopyFromProd();toast('הועתקו '+n+' מסמכים לסביבת הבדיקה');}
@@ -2381,6 +2425,7 @@ document.addEventListener('click',async e=>{
     }
     case 'beta-wipe':{
       if(ENV!=='beta')break;
+      closeSheet();
       if(!await askConfirm('למחוק את כל נתוני הבדיקה? הנתונים האמיתיים לא ישתנו.',{ok:'ניקוי',danger:true}))break;
       toast('מנקה…','busy');
       try{const n=await D.betaWipe();toast('נוקו '+n+' מסמכים מסביבת הבדיקה');}
@@ -2388,6 +2433,7 @@ document.addEventListener('click',async e=>{
       break;
     }
     case 'signout':{
+      closeSheet();
       if(!await askConfirm('לצאת מהחשבון?',{ok:'יציאה'}))break;
       try{D.stop();await D.signOut();}catch(err){console.error(err);toast('היציאה נכשלה','err');}
       break;
@@ -2408,6 +2454,7 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('input',e=>{
   const el=e.target;
+  if(el.id==='n-value'){const nb=$('#n-neg');if(nb)nb.classList.toggle('on',/^\s*[-−]/.test(el.value));}
   if(el.id==='f-amount'||el.id==='n-value')sizeAmount(el);
   if(el.id==='f-amount'||el.id==='f-inst')syncRep();
   if(el.classList&&el.classList.contains('bulk-in'))bulkTotal();
@@ -2438,9 +2485,17 @@ document.addEventListener('keydown',e=>{
 if(window.visualViewport){window.visualViewport.addEventListener('resize',fitSheet);window.visualViewport.addEventListener('scroll',fitSheet);}
 let rz;
 window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(S.ready){const pts=rangePoints();$$('#view [data-chart]').forEach(el=>drawChart(el,pts));}},150);});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)return;if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready){render();genRecurring();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)return;checkNewVersion();if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready){render();genRecurring();}});
 window.addEventListener('online',()=>{syncUpdate();if(SYNC.n>0&&D.reconnect)D.reconnect();if(S.ready){render();genRecurring();}});
 window.addEventListener('offline',()=>{syncUpdate();if(S.ready)render();});
+
+/* גרסה חדשה ירדה ברקע? ה-service worker שומר את מזהה הגרסה של הדף האחרון שהוריד (sw.js: META), ואנחנו משווים לשלנו */
+function checkNewVersion(){
+  if(S.newVer||typeof caches==='undefined')return;
+  caches.open('finance-meta-'+ENV).then(c=>c.match('new-version')).then(r=>r?r.text():'').then(v=>{
+    if(v&&v!==VERSION_LABEL&&!S.newVer){S.newVer=true;if(S.ready)render();}
+  }).catch(()=>{});
+}
 
 /* ================= boot ================= */
 function wantsQuickAdd(){
@@ -2457,7 +2512,12 @@ function wantsQuickAdd(){
     const mt=document.querySelector('meta[name="apple-mobile-web-app-title"]');if(mt)mt.setAttribute('content','בדיקה');
   }
   S.quick=wantsQuickAdd();
-  if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+  if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
+    // האפליקציה נפתחת מהעותק השמור, והגרסה החדשה יורדת ברקע. כשהיא שונה, מציעים רענון
+    navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='new-version')checkNewVersion();});
+    setTimeout(checkNewVersion,4000);
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
   try{await D.init();}
   catch(e){
     console.error(e);

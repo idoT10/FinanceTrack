@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node tests/run.js",
     "test:prod": "TARGET=index.html node tests/run.js",
-    "shots": "node tests/shots.js"
+    "shots": "node tests/shots.js",
+    "test:sw": "node tests/sw-browser.js"
   },
   "devDependencies": {
     "jsdom": "^29.1.1"

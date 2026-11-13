@@ -4,7 +4,7 @@ const metas=A=>A.$$('meta[name="theme-color"]').map(m=>m.getAttribute('content')
 module.exports=async t=>{
   let A=openApp(makeShared(),{beforeParse(w){w.localStorage.setItem('fin-theme','dark');}});
   t.ok(A.d.documentElement.getAttribute('data-theme')==='dark'&&metas(A)==='#0D1316,#0D1316','saved "dark" applied at load, status bar dark');
-  await sleep(150);A.tab('settings');
+  await sleep(150);A.tab('settings');A.set('theme');
   t.ok(A.$$('[data-a="theme"]')[2].classList.contains('on'),'"כהה" selected');
   A.click(A.$$('[data-a="theme"]')[1]);
   t.ok(A.d.documentElement.getAttribute('data-theme')==='light'&&A.w.localStorage.getItem('fin-theme')==='light'&&metas(A)==='#F2F4F1,#F2F4F1','switch to light');

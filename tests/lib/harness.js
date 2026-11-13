@@ -33,6 +33,7 @@ function openApp(shared,{path:p='/FinanceTrack/beta/',user=USER,beforeParse}={})
     click(el){if(!el)throw new Error('click: element not found');w.__inClick=true;el.dispatchEvent(new w.MouseEvent('click',{bubbles:true}));w.__inClick=false;},
     type(el,v){el.value=v;el.dispatchEvent(new w.Event('input',{bubbles:true}));},
     tab(v){app.click(d.querySelector('.tab[data-v="'+v+'"]'));},
+    set(v){app.click(d.querySelector('[data-a="set"][data-v="'+v+'"]'));},   // שורה בתפריט ההגדרות
     async confirm(){await sleep(10);app.click(d.querySelector('#dialog [data-r="1"]'));await sleep(150);},
     async importText(text,name='backup.json'){
       const inp=d.querySelector('#file');

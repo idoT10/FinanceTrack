@@ -15,7 +15,7 @@ module.exports=async t=>{
   await B.addExpense(99);
   t.ok(keys(sh,P_BETA+'tx/').length===1&&prodOnly()===before,'beta: writes only under users/<uid>/beta/main');
   P.tab('settings');B.tab('settings');
-  t.ok(!P.$('[data-a="beta-copy"]')&&!!B.$('[data-a="beta-copy"]'),'beta tools exist only in beta');
+  t.ok(!P.$('[data-a="set"][data-v="beta"]')&&!!B.$('[data-a="set"][data-v="beta"]'),'beta tools exist only in beta');
   const v=appVersion();
   t.ok(P.$('#view').textContent.includes('גרסה '+v)&&B.$('.beta-bar').textContent.includes(v),'version label "'+v+'" shown in settings and beta bar');
   t.ok(!P.errors.length&&!B.errors.length,'no script errors');
