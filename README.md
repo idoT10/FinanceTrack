@@ -94,4 +94,5 @@
 - גיבוי לדוגמה לבדיקות: `tests/fixtures/finance-backup-demo.json` (כולל חשבונות, העברות, תנועות חוזרות ותשלומים). לייבא **רק בסביבת הבדיקה**.
 - צילומי מסך של כל המסכים (390px, בהיר וכהה): `npm run shots`, נשמרים ב-`shots/`. דורש Playwright עם Chromium.
 - GitHub Actions מריץ את הבדיקות על כל Pull Request (`.github/workflows/test.yml`).
+- בדיקות בדפדפן אמיתי (לא חלק מ-`npm test`): `npm run test:sw` ו-`npm run test:sdk`.
 - רשימת הפיצ'רים המתוכננים: `docs/feature-proposals.md`.

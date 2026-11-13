@@ -435,7 +435,9 @@ const firebaseConfig = {
   messagingSenderId: "559069571788",
   appId: "1:559069571788:web:1cc9476232f89fbd3c7069"
 };
-const FB_VER = '10.14.1';
+const FB_VER = '13.3.0';
+// הגרסה הקודמת: נטענת רק אם החדשה לא נטענה (כדי שהאפליקציה לא תיתקע על מסך טעינה)
+const FB_VER_PREV = '10.14.1';
 /* סוגי חשבונות. הקבוצה נגזרת מהסוג (acctGroup): שוטף = יתרה מתעדכנת מהתנועות; חיסכון/חובות = עדכון ידני */
 const ASSET_CATS=[
   {id:'checking',name:'עו"ש',icon:'🏛️',color:'#2F7FA8'},
@@ -547,7 +549,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.6',APP_BUILD='b4',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.6',APP_BUILD='b5',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
@@ -657,10 +659,15 @@ function syncEnd(){SYNC.n=Math.max(0,SYNC.n-1);syncUpdate();}
 const D={
   uid:null,unsubs:[],seeding:false,
   async init(){
-    const base='https://www.gstatic.com/firebasejs/'+FB_VER+'/';
-    const [app,auth,fs]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
+    const load=v=>{const base='https://www.gstatic.com/firebasejs/'+v+'/';return Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);};
+    let mods;this.ver=FB_VER;
+    try{mods=await load(FB_VER);}catch(e){console.error(e);this.ver=FB_VER_PREV;mods=await load(FB_VER_PREV);}
+    const [app,auth,fs]=mods;
     this.A=auth;this.F=fs;
-    this.app=app.initializeApp(firebaseConfig);
+    // לבטא יש "אפליקציה" נפרדת בשם beta, ולכן מטמון מקומי והתחברות נפרדים מהייצור (הם באותה כתובת בדפדפן).
+    // סיבה: גרסה חדשה של הספרייה משדרגת את מבנה המטמון, וגרסה ישנה כבר לא יכולה לפתוח אותו.
+    // בלי ההפרדה, ניסוי בבטא היה משבית את העבודה בלי חיבור בייצור. בייצור השם נשאר ברירת המחדל, כמו תמיד.
+    this.app=ENV==='beta'?app.initializeApp(firebaseConfig,'beta'):app.initializeApp(firebaseConfig);
     // התחברות באימייל וסיסמה בלבד. getAuth() מוסיף גם את מנגנון הכניסה בחלון קופץ, שב-Safari נטען מהרשת
     // לפני שההתחברות השמורה מדווחת, ומעכב את כל הפתיחה. לכן initializeAuth בלי המנגנון הזה, עם אותה שמירה מקומית
     try{this.auth=auth.initializeAuth(this.app,{persistence:[auth.indexedDBLocalPersistence,auth.browserLocalPersistence,auth.browserSessionPersistence]});}
@@ -1732,6 +1739,7 @@ function viewSettings(){
       (ENV==='beta'?setRow('beta','🧪','#D9822B','סביבת בדיקה','העתקת הנתונים האמיתיים וניקוי'):'')+
       setRow('','🗑️','#C83E52','מחיקת כל הנתונים','','reset')+'</div>'+
     '<p class="foot">'+(S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות, '+S.nw.history.length+' נקודות בגרף<br>גרסה '+VERSION_LABEL+(ENV==='beta'?' · סביבת בדיקה':'')+
+    (ENV==='beta'?'<br>ספרייה '+esc(D.ver||'')+(D.ver&&D.ver!==FB_VER?' (הגרסה החדשה '+FB_VER+' לא נטענה)':''):'')+
     (ENV==='beta'&&TIMES.data!==undefined?'<br>זמני פתיחה (מילישניות מתחילת הטעינה): ספרייה '+TIMES.lib+' · מסך '+TIMES.view+' · התחברות '+TIMES.auth+' · נתונים '+TIMES.data:'')+'</p>';
 }
 function catsSection(){
