@@ -15,6 +15,10 @@ CATS=[('super','סופר','🛒','expense','#4E9A5F'),('eat','אוכל בחוץ'
       ('gift','מתנות','🎁','expense','#B3568A'),('refund','החזרים','🧾','income','#7C8580')]
 categories=[{'id':'demo-cat-'+k,'name':n,'icon':i,'type':t,'color':c,'ord':idx+1} for idx,(k,n,i,t,c) in enumerate(CATS)]
 cname={'demo-cat-'+k:n for k,n,*_ in CATS}
+# R4: תקציב חודשי לקטגוריה, לפי חודש תחילה. "אוכל בחוץ" הוקטן באוקטובר, כדי שיהיה תקציב שהשתנה באמצע
+BUDGETS={'super':{'2026-04':2400},'eat':{'2026-04':700,'2026-10':600},'home':{'2026-04':5800},'shop':{'2026-06':1000},'fun':{'2026-04':400}}
+for c in categories:
+    if c['id'][len('demo-cat-'):] in BUDGETS: c['budgets']=BUDGETS[c['id'][len('demo-cat-'):]]
 
 tx=[]; seq=[0]
 # ---------- live accounts (R2): balance = sum of the effects of their transactions ----------

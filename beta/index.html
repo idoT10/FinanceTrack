@@ -238,6 +238,19 @@ textarea.input{min-height:130px;direction:ltr;text-align:left;resize:vertical;fo
 .neg-btn{width:38px;height:38px;border-radius:10px;background:var(--sunk);font-weight:700;font-size:17px;display:grid;place-items:center;flex:none;color:var(--ink-2)}
 .neg-btn.on{background:color-mix(in srgb,var(--expense) 16%,var(--surface));color:var(--expense)}
 .brk-mini{display:block;width:100%;text-align:start}
+/* תקציב (R4) */
+.bg-row{display:block;width:100%;padding:9px 0;text-align:start}
+.bg-top{display:flex;align-items:center;gap:10px;font-size:14.5px}
+.bg-top b{font-weight:660}
+.bg-of{color:var(--ink-3);font-size:12.5px;white-space:nowrap}
+.bg-track{display:flex;height:7px;border-radius:4px;background:var(--sunk);margin:7px 40px 0 0;overflow:hidden}
+.bg-track i{display:block;height:100%}
+.bg-track i.soft{opacity:.38}
+.bg-track .ok{background:var(--income)}.bg-track .wn{background:var(--warn)}.bg-track .ov{background:var(--expense)}
+.bg-left{display:block;font-size:12.5px;margin:4px 40px 0 0}
+.t-ok{color:var(--ink-2)}.t-wn{color:var(--warn)}.t-ov{color:var(--expense);font-weight:650}
+.bg-sum{padding:2px 0 10px;border-bottom:1px solid var(--line);margin-bottom:4px;gap:10px;flex-wrap:wrap}
+.bg-sum b{font-size:17px}
 .brk-mini .stack{margin:0 0 10px}
 .brk-mini .legend{margin:0}
 .bk-panel{margin-top:12px;display:flex;flex-direction:column;gap:10px}
@@ -497,7 +510,10 @@ function normTx(o){
   const cats=(Array.isArray(o.categories)?o.categories:[]).filter(c=>c&&c.id&&c.name).map(c=>({
     id:String(c.id),name:String(c.name),icon:String(c.icon||'🏷️'),ord:+c.ord||0,
     type:c.type==='income'?'income':'expense',
-    color:/^#[0-9a-f]{6}$/i.test(c.color)?c.color:PALETTE[8]
+    color:/^#[0-9a-f]{6}$/i.test(c.color)?c.color:PALETTE[8],
+    // R4: תקציב חודשי לקטגוריית הוצאה, לפי חודש תחילה: {'YYYY-MM': סכום}
+    ...(c.type!=='income'&&c.budgets&&typeof c.budgets==='object'?(b=>Object.keys(b).length?{budgets:b}:{})(Object.fromEntries(
+      Object.entries(c.budgets).filter(([k,v])=>/^\d{4}-\d{2}$/.test(k)&&isFinite(+v)&&+v>=0).map(([k,v])=>[k,r2(+v)]))):{})
   }));
   const txs=(Array.isArray(o.transactions)?o.transactions:[]).filter(t=>t&&t.id&&/^\d{4}-\d{2}-\d{2}$/.test(t.date)&&isFinite(+t.amount)).map(t=>({
     id:String(t.id),type:TX_TYPES.includes(t.type)?t.type:'expense',amount:r2(+t.amount),
@@ -549,7 +565,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.6',APP_BUILD='b6',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.7',APP_BUILD='b1',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
@@ -865,13 +881,14 @@ const D={
     };
     await Promise.all(Array.from({length:Math.min(PAR,chunks.length)},worker));
   },
-  async importAll(tx,nw,rec){
+  async importAll(tx,nw,rec,catBudgets){
     syncBegin();
-    try{await this._importAll(tx,nw,rec);}finally{syncEnd();}
+    try{await this._importAll(tx,nw,rec,catBudgets);}finally{syncEnd();}
   },
-  async _importAll(tx,nw,rec){
+  async _importAll(tx,nw,rec,catBudgets){
     const ops=[];
     (rec||[]).forEach(r=>{const {id,...d}=r;ops.push({ref:this.ref('recurring',id),data:d});});
+    (catBudgets||[]).forEach(b=>ops.push({ref:this.ref('categories',b.id),update:true,data:{budgets:b.budgets}}));
     tx.categories.forEach(c=>{const {id,...r}=c;ops.push({ref:this.ref('categories',id),data:r});});
     tx.transactions.forEach(t=>{const {id,...r}=t;ops.push({ref:this.ref('tx',id),data:r});});
     nw.assets.forEach(x=>{const {id,...r}=x;ops.push({ref:this.ref('assets',id),data:r});});
@@ -1124,6 +1141,68 @@ function recRemaining(r){
 }
 const committedInst=()=>r2(S.rec.reduce((s,r)=>s+recRemaining(r),0));
 /* צפוי עוד החודש: תבניות שהיום שלהן החודש עוד לא הגיע */
+/* ================= תקציב לקטגוריה (R4) =================
+   c.budgets = {'YYYY-MM': סכום}: התקציב החודשי מהחודש הזה והלאה (0 = בלי תקציב מהחודש הזה).
+   כך שינוי תקציב חל מהחודש שבו שינו אותו, וחודשים קודמים ממשיכים להיות מוצגים מול התקציב שהיה אז. */
+function budgetOf(c,mk){
+  if(!c||c.type!=='expense'||!c.budgets)return 0;
+  let best='';for(const k in c.budgets)if(k<=mk&&k>best)best=k;
+  return best?(+c.budgets[best]||0):0;
+}
+/* צפוי עוד החודש לפי קטגוריה: הוצאות מתבניות (חוזרות ותשלומים) שהיום שלהן החודש עוד לא הגיע */
+function expectedByCat(){
+  const cur=monthKey(new Date()),today=todayStr(),m={};
+  for(const r of S.rec){
+    if(r.type!=='expense'||r.paused||recNext(r)!==cur||dayIn(cur,r.day)<=today)continue;
+    if(r.count&&recIndex(r,cur)>r.count)continue;
+    if(r.count&&r.paid!=null&&r.total-r.paid<0.005)continue;
+    const k=S.tx.categories.some(c=>c.id===r.categoryId)?r.categoryId:'_none';
+    m[k]=r2((m[k]||0)+(r.count?payAmount(r,recIndex(r,cur)):r.amount));
+  }
+  return m;
+}
+/* used = מה שכבר הוצא, exp = מה שצפוי עוד החודש. הצבע ו"נשארו" לפי שניהם יחד */
+function budgetState(c,budget,used,exp){
+  const tot=r2(used+exp),left=r2(budget-tot),pc=tot/budget*100;
+  return{c,budget,used,exp,left,pc,k:pc>100?'ov':pc>=75?'wn':'ok'};
+}
+/* שורה לכל קטגוריה שיש לה תקציב בחודש mk, ומה שהוצא בקטגוריות בלי תקציב */
+function budgetRows(mk,monthTx){
+  const used={},exp=mk===monthKey(new Date())?expectedByCat():{};
+  for(const t of monthTx)if(t.type==='expense'){const k=catKey(t);used[k]=(used[k]||0)+t.amount;}
+  const rows=[];
+  for(const c of S.tx.categories){const b=budgetOf(c,mk);if(b>0)rows.push(budgetState(c,b,r2(used[c.id]||0),r2(exp[c.id]||0)));}
+  const ids=new Set(rows.map(r=>r.c.id));let rest=0,restN=0;
+  for(const k in used)if(!ids.has(k)){rest+=used[k];restN++;}
+  rows.sort((a,b)=>b.pc-a.pc);
+  return{rows,rest:r2(rest),restN};
+}
+function budgetLeftText(s){
+  if(s.left>=0)return 'נשארו '+money(s.left)+(s.exp?', אחרי '+money(s.exp)+' שצפויים':'');
+  return (s.used>s.budget?'חריגה של ':'צפויה חריגה של ')+money(-s.left);
+}
+function budgetRow(s,action,extra){
+  const w=x=>Math.min(100,Math.max(0,x/s.budget*100)),wu=w(s.used),we=Math.min(100-wu,w(s.exp));
+  return '<button class="bg-row" data-a="'+action+'" data-id="'+esc(s.c.id)+'"'+(extra||'')+'><span class="bg-top"><span class="ic sm" style="--c:'+s.c.color+'">'+esc(s.c.icon)+'</span><span class="grow">'+esc(s.c.name)+'</span><b>'+money(s.used)+'</b><span class="bg-of">מתוך '+money(s.budget)+'</span></span>'+
+    '<span class="bg-track"><i class="'+s.k+'" style="width:'+wu+'%"></i>'+(we>0?'<i class="'+s.k+' soft" style="width:'+we+'%"></i>':'')+'</span><span class="bg-left t-'+s.k+'">'+budgetLeftText(s)+'</span></button>';
+}
+/* חלון ההוספה: כמה נשאר בתקציב של הקטגוריה שנבחרה, כולל הסכום שמוקלד */
+function syncBudgetHint(){
+  const el=$('#f-budget-hint'),f=S.form;if(!el||!f)return;
+  let h='';
+  const c=f.type==='expense'&&f.categoryId?S.tx.categories.find(x=>x.id===f.categoryId):null;
+  const date=$('#f-date')&&/^\d{4}-\d{2}-\d{2}$/.test($('#f-date').value)?$('#f-date').value:todayStr(),mk=date.slice(0,7),cur=monthKey(new Date());
+  const b=c?budgetOf(c,mk):0;
+  if(b>0&&(mk===cur||S.monthLoaded[mk])&&f.repeat!=='inst'){
+    let used=0;for(const t of S.tx.transactions)if(t.type==='expense'&&t.date.slice(0,7)===mk&&t.categoryId===c.id&&t.id!==f.id)used+=t.amount;
+    const a=parseAmount($('#f-amount').value),st=budgetState(c,b,r2(used+(a>0?a:0)),mk===cur?(expectedByCat()[c.id]||0):0);
+    h=esc(c.name)+': '+(st.left>=0?'נשארו <b>'+money(st.left)+'</b> מתוך '+money(b):'<b>חריגה של '+money(-st.left)+'</b> מתקציב של '+money(b))+
+      (mk===cur?' החודש':' ב'+esc(monthName(mk)))+(a>0?', כולל ההוצאה הזאת':'');
+    el.className='hint t-'+st.k;
+  }
+  el.innerHTML=h;el.hidden=!h;
+}
+
 function expectedThisMonth(){
   const cur=monthKey(new Date()),today=todayStr(),o={exp:0,inc:0};
   for(const r of S.rec){
@@ -1511,7 +1590,18 @@ function viewHome(){
   const sums={};
   for(const x of monthTx)if(x.type==='expense'){const k=catKey(x);sums[k]=(sums[k]||0)+x.amount;}
   const top=Object.keys(sums).sort((a,b)=>sums[b]-sums[a]).slice(0,4);
-  if(top.length){
+  const bd=budgetRows(mk,monthTx);
+  if(bd.rows.length){
+    // יש תקציבים: הכרטיס מציג אותם במקום "לאן הלך הכסף החודש"
+    const sum=k=>r2(bd.rows.reduce((s,r)=>s+r[k],0)),tb=sum('budget'),tu=sum('used'),te=sum('exp'),all=budgetState(null,tb,tu,te);
+    const days=new Date(now.getFullYear(),now.getMonth()+1,0).getDate()-now.getDate()+1;
+    h+='<div class="sec-h"><h3>תקציב '+esc(F.monthOnly.format(now))+'</h3><button class="link" data-a="go-cats">עריכה</button></div>'+
+      '<div class="surface" id="budget-card"><div class="row between bg-sum"><span><b>'+money(tu)+'</b> <span class="muted small">מתוך '+money(tb)+'</span></span>'+
+      '<span class="small t-'+all.k+'" style="font-weight:650">'+(all.left>=0?'נשארו '+money(all.left)+(days===1?' להיום':' ל־'+days+' ימים'):budgetLeftText(all))+'</span></div>'+
+      bd.rows.map(s=>budgetRow(s,'go',' data-v="tx" data-cat="'+esc(s.c.id)+'"')).join('')+
+      (te?'<p class="hint" style="margin:6px 0 2px">החלק הבהיר בפס: '+money(te)+' שצפויים עוד החודש</p>':'')+
+      (bd.rest?'<p class="hint" style="margin:6px 0 2px">בלי תקציב: '+money(bd.rest)+' ב'+(bd.restN===1?'קטגוריה אחת':'־'+bd.restN+' קטגוריות')+'</p>':'')+'</div>';
+  }else if(top.length){
     h+='<div class="sec-h"><h3>לאן הלך הכסף החודש</h3><button class="link" data-a="go" data-v="tx">כל התנועות</button></div>'+
       '<div class="surface">'+top.map(id=>barRow(id,sums[id],exp,'go',' data-v="tx" data-cat="'+esc(id)+'"')).join('')+'</div>';
   }
@@ -1573,6 +1663,12 @@ function txResults(){
     h+='<div class="filter-sum">'+(list.length===1?'תנועה אחת':list.length+' תנועות')+(q?' מתאימות לחיפוש':' בסינון')+(fa?'':', בסך '+money(s,{dec:true}))+
       (fa?' · יתרה ב'+esc(fa.x.name)+': '+money(fa.kind==='liab'?-fa.x.value:fa.x.value,{dec:true}):'')+'</div>';
   }
+  const expM=mk===monthKey(new Date())?expectedByCat():{};
+  const bc=S.txCat&&!q&&!fa&&(S.txType==='all'||S.txType==='expense')?S.tx.categories.find(c=>c.id===S.txCat):null,bb=bc?budgetOf(bc,mk):0;
+  if(bb>0){
+    const st=budgetState(bc,bb,r2(monthTx.reduce((x,t)=>x+(t.type==='expense'&&t.categoryId===bc.id?t.amount:0),0)),r2(expM[bc.id]||0));
+    h+='<div class="filter-sum t-'+st.k+'" id="tx-budget">תקציב '+money(bb)+' · '+budgetLeftText(st)+'</div>';
+  }
 
   const btype=S.txType==='income'?'income':'expense';
   if(!S.txCat&&!q&&!fa&&S.txType!=='transfer'){
@@ -1584,7 +1680,8 @@ function txResults(){
       const total=btype==='income'?tot.inc:tot.exp;
       h+='<div class="sec-h"><h3>'+(btype==='income'?'פילוח הכנסות':'פילוח הוצאות')+'</h3><button class="link" data-a="brk-toggle">'+(S.brkOpen?'הסתרה':'פירוט')+'</button></div>';
       h+=S.brkOpen
-        ?'<div class="surface">'+bids.map(id=>barRow(id,bs[id],total,'tx-cat')).join('')+'</div>'
+        ?'<div class="surface">'+bids.map(id=>{const c=catView(id),b=btype==='expense'?budgetOf(c,mk):0;
+            return b>0?budgetRow(budgetState(c,b,r2(bs[id]),r2(expM[id]||0)),'tx-cat'):barRow(id,bs[id],total,'tx-cat');}).join('')+'</div>'
         :'<button class="surface brk-mini" data-a="brk-toggle" aria-label="הצגת הפילוח המלא"><span class="stack">'+bids.map(id=>'<i style="flex-grow:'+bs[id]+';background:'+catView(id).color+'"></i>').join('')+'</span>'+
           '<span class="legend">'+bids.slice(0,3).map(id=>{const c=catView(id);return '<span><i style="background:'+c.color+'"></i>'+esc(c.name)+' <span class="num">'+pct(bs[id],total)+'%</span></span>';}).join('')+
           (bids.length>3?'<span>ועוד '+(bids.length-3)+'</span>':'')+'</span></button>';
@@ -1821,9 +1918,9 @@ function openTxSheet(id){
     '<label class="amount-wrap" id="f-amount-wrap"><span class="cur">₪</span><input id="f-amount" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" aria-label="סכום" value="'+(t?t.amount:'')+'"></label>'+
     '<div class="field-label">תיאור</div><input id="f-note" class="input" placeholder="למשל: קפה עם דני" enterkeyhint="done" autocomplete="off" value="'+esc(t?t.note:'')+'">'+
     '<div id="f-cat-sec"><div class="field-label">קטגוריה</div><div class="chips block" id="f-cats"></div>'+
-    '<div class="newcat" id="f-newcat" hidden><input id="f-newcat-icon" class="input emoji-in" maxlength="8" value="🏷️" aria-label="אייקון"><input id="f-newcat-name" class="input grow" placeholder="שם הקטגוריה" enterkeyhint="done"><button class="btn primary" style="padding:12px 16px" data-a="f-newcat-save">הוספה</button></div></div>'+
+    '<div class="newcat" id="f-newcat" hidden><input id="f-newcat-icon" class="input emoji-in" maxlength="8" value="🏷️" aria-label="אייקון"><input id="f-newcat-name" class="input grow" placeholder="שם הקטגוריה" enterkeyhint="done"><button class="btn primary" style="padding:12px 16px" data-a="f-newcat-save">הוספה</button></div><p class="hint" id="f-budget-hint" hidden></p></div>'+
     '<div id="f-acct-sec"><div class="field-label" id="f-acct-label">מאיזה חשבון</div><div class="chips line" id="f-accts"></div></div>'+
-    '<div id="f-xfer-sec"><div class="field-label">מחשבון</div><div class="chips line" id="f-from"></div><div class="field-label">לחשבון</div><div class="chips line" id="f-to"></div></div>'+
+    '<div id="f-xfer-sec"><div class="field-label">מחשבון</div><div class="chips line" id="f-from"></div><div class="field-label">לחשבון</div><div class="chips line" id="f-to"></div><div id="f-debt" style="margin-top:10px" hidden><button class="chip" data-a="f-debt"></button></div></div>'+
     '<div class="field-label">תאריך</div><div class="date-row"><div class="chips" id="f-datechips"><button class="chip" data-a="f-date" data-v="t">היום</button><button class="chip" data-a="f-date" data-v="y">אתמול</button></div><input type="date" id="f-date" class="input" value="'+f.date+'"></div>'+
     (t&&t.recId?'<p class="hint">'+(t.inst?'שינוי הסכום כאן משנה את מה שנשאר: היתרה תתחלק מחדש על התשלומים הבאים.':'שינוי כאן חל רק על התנועה הזאת. לשינוי החודשים הבאים: הגדרות ← תנועות חוזרות ותשלומים.')+'</p>':'')+
     (t?'':'<div id="f-rep-sec"><div class="field-label">חזרה</div><div class="chips wrap" id="f-rep">'+
@@ -1872,6 +1969,10 @@ function renderXferChips(){
   $('#f-from').innerHTML=all.length<2?none:all.map(a=>acctChip(a,f.fromId===a.x.id,'f-from')).join('');
   $('#f-to').innerHTML=all.length<2?'':all.filter(a=>a.x.id!==f.fromId).map(a=>acctChip(a,f.toId===a.x.id,'f-to')).join('');
   scrollToOn($('#f-from'));scrollToOn($('#f-to'));
+  // תשלום כרטיס אשראי: כפתור שממלא את מלוא החוב (רק בהעברה חדשה אל כרטיס שיש בו חוב)
+  const dr=$('#f-debt');
+  if(dr){const to=acctOf(f.toId),show=!f.id&&!!to&&to.kind==='liab'&&to.x.category==='credit'&&to.x.value>0;
+    dr.hidden=!show;if(show)dr.firstChild.innerHTML='מלוא החוב: '+money(to.x.value,{dec:true});}
 }
 function syncTxType(){
   const v=S.form.type,cls=v==='expense'?'exp':v==='income'?'inc':'xfer';
@@ -1899,6 +2000,7 @@ function syncRep(){
     }else h='הסכום שמקלידים הוא הסכום הכולל. מספר תשלומים: 2 עד 60.';
   }
   $('#f-rep-hint').innerHTML=h;$('#f-rep-hint').hidden=!h;
+  syncBudgetHint();
 }
 function renderCatChips(){
   const f=S.form,box=$('#f-cats');if(!box||!f)return;
@@ -1911,7 +2013,7 @@ function renderCatChips(){
   box.innerHTML=(all.length?'':'<span class="muted small" style="align-self:center">עוד אין קטגוריות מסוג זה.</span>')+
     cats.map(c=>'<button class="chip '+(f.categoryId===c.id?'on':'')+'" style="--c:'+c.color+'" data-a="f-cat" data-id="'+esc(c.id)+'">'+esc(c.icon)+' '+esc(c.name)+'</button>').join('')+
     '<button class="chip add" data-a="f-newcat">＋ חדשה</button>';
-  scrollToOn(box);
+  scrollToOn(box);syncBudgetHint();
 }
 function syncDateChips(){
   const d=S.form.date;
@@ -1959,6 +2061,15 @@ function saveTx(){
   if(!xfer&&!f.id)bumpCatUse(f.categoryId);
   if(!f.id&&f.repeat!=='once'){saveRecurringNew(f,fields,date);return;}
   const edited=!!f.id,tid=t.id;
+  let over='';
+  if(!edited&&!xfer&&f.type==='expense'&&active){
+    const c=S.tx.categories.find(x=>x.id===t.categoryId),b=budgetOf(c,mk);
+    if(b>0){
+      let used=0;for(const x of S.tx.transactions)if(x.type==='expense'&&x.date.slice(0,7)===mk&&x.categoryId===c.id)used+=x.amount;
+      const tot=r2(used+(mk===monthKey(new Date())?(expectedByCat()[c.id]||0):0));
+      if(tot>b&&tot-amount<=b)over=' · חרגתם מהתקציב של '+c.name+' ב־₪'+F.n0.format(Math.round(tot-b));
+    }
+  }
   saveTxFx(t,prev);closeSheet();render();
   const undo=edited
     ?()=>{   // מחזירים את הגרסה הקודמת (גם את היתרות)
@@ -1970,7 +2081,7 @@ function saveTx(){
       S.tx.transactions=S.tx.transactions.filter(x=>x.id!==tid);
       delTxFx(t);render();toast('ההוספה בוטלה');
     };
-  toast(!active?'נשמר ב'+monthName(mk):edited?'השינויים נשמרו':xfer?'ההעברה נשמרה':(f.type==='income'?'ההכנסה נשמרה':'ההוצאה נשמרה'),'',undo);
+  toast(!active?'נשמר ב'+monthName(mk):edited?'השינויים נשמרו':xfer?'ההעברה נשמרה':(f.type==='income'?'ההכנסה נשמרה':'ההוצאה נשמרה'+over),'',undo);
 }
 
 /* תבנית חדשה (כל חודש / תשלומים). כל החודשים שהיום שלהם כבר הגיע נוצרים מיד, באותה שמירה
@@ -2080,18 +2191,30 @@ function saveCat(){
   const name=$('#c-name').value.trim();
   if(!name){toast('צריך שם לקטגוריה');focusEl($('#c-name'));return;}
   const icon=firstGlyph($('#c-icon').value)||'🏷️';
-  let c;
+  // תקציב: רק לקטגוריית הוצאה. ריק = בלי תקציב
+  const cur=monthKey(new Date()),braw=$('#c-budget')?$('#c-budget').value.trim():'';
+  const bud=braw===''?0:parseAmount(braw);
+  if(!(bud>=0)){toast('צריך סכום תקין לתקציב');focusEl($('#c-budget'),true);return;}
+  let c,prev=null;
   if(f.id){
     c=S.tx.categories.find(x=>x.id===f.id);
     if(!c)return;
+    prev=JSON.parse(JSON.stringify(c));
     Object.assign(c,{name,icon,color:f.color,type:catLocked(f)?c.type:f.type});
   }else{
     c={id:uid(),name,icon,type:f.type,color:f.color,ord:Date.now()};
     S.tx.categories.push(c);
     S.catTab=f.type;
   }
-  const edited=!!f.id;
-  D.putCat(c);closeSheet();render();toast(edited?'הקטגוריה עודכנה':'הקטגוריה נוספה');
+  // התקציב החדש נרשם מהחודש הנוכחי והלאה; מה שהיה בתוקף בחודשים קודמים נשאר
+  if(c.type==='expense'){if(bud!==budgetOf(c,cur))c.budgets=Object.assign({},c.budgets,{[cur]:bud});}
+  else delete c.budgets;
+  const edited=!!f.id,cid=c.id;
+  D.putCat(c);closeSheet();render();
+  toast(edited?'הקטגוריה עודכנה':'הקטגוריה נוספה','',edited?()=>{
+    const i=S.tx.categories.findIndex(x=>x.id===cid);if(i<0)return;
+    S.tx.categories[i]=prev;D.putCat(prev);render();toast('השינויים בוטלו');
+  }:null);
 }
 
 /* ================= sheet: עדכון מלא ================= */
@@ -2174,6 +2297,8 @@ function openCatSheet(id){
     '<div class="emoji-pick">'+EMOJIS.map(e=>'<button data-a="f-emoji" data-v="'+e+'" aria-label="בחירת אייקון">'+e+'</button>').join('')+'</div>'+
     '<div class="field-label">סוג</div><div class="seg" id="c-type"><button data-a="f-ctype" data-v="expense">הוצאה</button><button data-a="f-ctype" data-v="income">הכנסה</button></div>'+
     '<p class="hint" id="c-used-hint"></p>'+
+    '<div id="c-budget-sec"><div class="field-label">תקציב חודשי</div><div class="row" style="gap:10px"><input id="c-budget" class="input" style="width:150px;direction:ltr;text-align:left;font-weight:650" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="בלי" value="'+(c&&budgetOf(c,monthKey(new Date()))||'')+'" aria-label="תקציב חודשי">'+
+      '<span class="muted small">₪ בחודש. ריק = בלי תקציב</span></div><p class="hint">שינוי חל מ'+esc(F.monthOnly.format(new Date()))+' והלאה. חודשים קודמים לא משתנים.</p></div>'+
     '<div class="field-label">צבע</div><div class="swatches">'+PALETTE.map(p=>'<button class="sw" style="--c:'+p+'" data-a="f-color" data-v="'+p+'" aria-label="צבע"></button>').join('')+'</div>'+
     '<div class="sheet-actions">'+(c?'<button class="btn ghost danger" data-a="cat-del">מחיקה</button>':'')+'<button class="btn primary grow" data-a="cat-save" data-primary>'+(c?'שמירת שינויים':'הוספת קטגוריה')+'</button></div>';
   openSheet(html);
@@ -2193,6 +2318,7 @@ function syncCatForm(){
     h.style.display=h.textContent?'':'none';
   }
   $$('#sheet .sw').forEach(b=>b.classList.toggle('on',b.dataset.v===f.color));
+  const bs=$('#c-budget-sec');if(bs)bs.hidden=f.type!=='expense';
 }
 
 /* ================= sheet: סטטיסטיקות ================= */
@@ -2272,14 +2398,16 @@ const nkey=v=>String(v==null?'':v).trim().replace(/\s+/g,' ').toLowerCase();
 const txKey=t=>t.type+'|'+t.date+'|'+r2(+t.amount)+'|'+nkey(t.note);
 const histDay=t=>{const d=new Date(+t);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();};
 function planImport(bTx,bNw,cur,bRec){
-  const add={categories:[],transactions:[],assets:[],liabilities:[],history:[],recurring:[]};
+  const add={categories:[],transactions:[],assets:[],liabilities:[],history:[],recurring:[],catBudgets:[]};
+  // קטגוריה שכבר קיימת (למשל קטגוריות ברירת המחדל בחשבון חדש) ואין לה תקציב: התקציב מהגיבוי מתווסף. תקציב קיים לא נדרס
+  const takeBudget=(have,c)=>{if(have&&c.budgets&&have.type==='expense'&&!have.budgets)add.catBudgets.push({id:have.id,budgets:c.budgets});};
   const st={catsLinked:0,txSkip:0,itemsSkip:0,histSkip:0,recSkip:0};
   // קטגוריות: לפי מזהה, אחר כך לפי סוג+שם
   const catIds=new Set(cur.cats.map(c=>c.id)),catByKey=new Map(cur.cats.map(c=>[c.type+'|'+nkey(c.name),c])),catMap=new Map();
   for(const c of bTx.categories){
-    if(catIds.has(c.id)){catMap.set(c.id,c.id);st.catsLinked++;continue;}
+    if(catIds.has(c.id)){catMap.set(c.id,c.id);st.catsLinked++;takeBudget(cur.cats.find(x=>x.id===c.id),c);continue;}
     const k=c.type+'|'+nkey(c.name),hit=catByKey.get(k);
-    if(hit){catMap.set(c.id,hit.id);st.catsLinked++;continue;}
+    if(hit){catMap.set(c.id,hit.id);st.catsLinked++;if(cur.cats.includes(hit))takeBudget(hit,c);continue;}
     add.categories.push(c);catIds.add(c.id);catByKey.set(k,c);catMap.set(c.id,c.id);
   }
   const catById=new Map([...cur.cats,...add.categories].map(c=>[c.id,c]));
@@ -2320,7 +2448,7 @@ function planImport(bTx,bNw,cur,bRec){
     const cid=r.categoryId&&catMap.has(r.categoryId)?catMap.get(r.categoryId):null;
     add.recurring.push(Object.assign({},r,{categoryId:cid}));rIds.add(r.id);rKeys.add(recKey(r));
   }
-  const total=add.categories.length+add.transactions.length+add.assets.length+add.liabilities.length+add.history.length+add.recurring.length;
+  const total=add.categories.length+add.transactions.length+add.assets.length+add.liabilities.length+add.history.length+add.recurring.length+add.catBudgets.length;
   return{add,st,total};
 }
 function isPristine(cur){
@@ -2334,6 +2462,7 @@ function importSummary(plan){
   const row=(label,addN,skipN)=>{if(addN||skipN)rows.push('<div class="row between" style="padding:7px 2px;border-bottom:1px solid var(--line)"><span>'+label+'</span><span class="num small"><b>'+F.n0.format(addN)+'</b> חדשים'+(skipN?' · <span class="muted">'+F.n0.format(skipN)+' קיימים</span>':'')+'</span></div>');};
   row('תנועות',a.transactions.length,st.txSkip);
   row('קטגוריות',a.categories.length,st.catsLinked);
+  row('תקציבים לקטגוריות קיימות',a.catBudgets.length,0);
   row('נכסים והתחייבויות',a.assets.length+a.liabilities.length,st.itemsSkip);
   row('נקודות בגרף',a.history.length,st.histSkip);
   row('תנועות חוזרות',a.recurring.length,st.recSkip);
@@ -2343,7 +2472,7 @@ async function runImport(plan){
   toast('מייבא…','busy');
   try{
     const a=plan.add;
-    await D.importAll({categories:a.categories,transactions:a.transactions},{assets:a.assets,liabilities:a.liabilities,history:a.history},a.recurring);
+    await D.importAll({categories:a.categories,transactions:a.transactions},{assets:a.assets,liabilities:a.liabilities,history:a.history},a.recurring,a.catBudgets);
     toast('נוספו '+F.n0.format(plan.total)+' פריטים מהגיבוי');
   }catch(e){console.error(e);toast('הייבוא לא הושלם. אפשר לייבא שוב, מה שכבר נוסף ידולג'+errTag(e),'err');}
 }
@@ -2412,6 +2541,8 @@ document.addEventListener('click',async e=>{
     case 'f-rep':if(f){f.repeat=v;syncRep();if(v==='inst')focusEl($('#f-inst'),true);}break;
     case 'f-from':if(f){f.fromId=id;if(f.toId===id)f.toId=null;renderXferChips();}break;
     case 'f-to':if(f){f.toId=id;renderXferChips();}break;
+    case 'f-debt':{const to=f&&acctOf(f.toId),i=$('#f-amount');if(to&&i){i.value=String(to.x.value);sizeAmount(i);syncRep();}break;}
+    case 'go-cats':S.view='settings';S.setPage='cats';S.catTab='expense';try{history.pushState({set:'cats'},'');}catch(err){}render();window.scrollTo(0,0);break;
     case 'f-cat':if(f){f.categoryId=id;renderCatChips();}break;
     case 'f-newcat':{const box=$('#f-newcat');box.hidden=!box.hidden;if(!box.hidden)focusEl($('#f-newcat-name'));break;}
     case 'f-newcat-save':addInlineCat();break;

@@ -10,7 +10,10 @@
         "icon": "🛒",
         "type": "expense",
         "color": "#4E9A5F",
-        "ord": 1
+        "ord": 1,
+        "budgets": {
+          "2026-04": 2400
+        }
       },
       {
         "id": "demo-cat-eat",
@@ -18,7 +21,11 @@
         "icon": "☕",
         "type": "expense",
         "color": "#D0663A",
-        "ord": 2
+        "ord": 2,
+        "budgets": {
+          "2026-04": 700,
+          "2026-10": 600
+        }
       },
       {
         "id": "demo-cat-car",
@@ -34,7 +41,10 @@
         "icon": "🏠",
         "type": "expense",
         "color": "#B3568A",
-        "ord": 4
+        "ord": 4,
+        "budgets": {
+          "2026-04": 5800
+        }
       },
       {
         "id": "demo-cat-fun",
@@ -42,7 +52,10 @@
         "icon": "🎬",
         "type": "expense",
         "color": "#7153A8",
-        "ord": 5
+        "ord": 5,
+        "budgets": {
+          "2026-04": 400
+        }
       },
       {
         "id": "demo-cat-shop",
@@ -50,7 +63,10 @@
         "icon": "🛍️",
         "type": "expense",
         "color": "#C83E52",
-        "ord": 6
+        "ord": 6,
+        "budgets": {
+          "2026-06": 1000
+        }
       },
       {
         "id": "demo-cat-salary",
