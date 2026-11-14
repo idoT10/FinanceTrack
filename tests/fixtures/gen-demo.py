@@ -1,7 +1,7 @@
 import json, random, datetime as dt
-random.seed(20261113)
+random.seed(20261114)
 TZ=dt.timezone(dt.timedelta(hours=3))
-START=dt.date(2026,4,1); TODAY=dt.date(2026,11,13)
+START=dt.date(2026,4,1); TODAY=dt.date(2026,11,14)
 def ms(d,h=12,m=0,s=0): return int(dt.datetime(d.year,d.month,d.day,h,m,s,tzinfo=TZ).timestamp()*1000)
 def days():
     d=START
@@ -18,7 +18,7 @@ cname={'demo-cat-'+k:n for k,n,*_ in CATS}
 
 tx=[]; seq=[0]
 # ---------- live accounts (R2): balance = sum of the effects of their transactions ----------
-LIVE={'checking':'a','wallet':'a','visa':'l'}
+LIVE={'checking':'a','wallet':'a','visa':'l','joint':'a'}   # joint: חשבון משותף שנפתח בספטמבר ונכנס למינוס (1.0.6)
 ACC=lambda k:'demo-'+LIVE[k]+'-'+k
 def bal(key,upto=None):
     aid=ACC(key); sign=1 if LIVE[key]=='a' else -1; s=0
@@ -71,6 +71,8 @@ for d in days():
     if dom==9 and 6<=d.month<=11: add(d,900,'shop','מחשב נייד',hour=6,rec='demo-rec-laptop',inst=(d.month-5,6))
     if dom==20 and d.month in (9,10): add(d,300,'home','מקרר',hour=6,acct='visa',rec='demo-rec-fridge',inst=(d.month-8,12))
     if dom==3 and d.month<8: add(d,29.90,'subs','עיתון',hour=6,rec='demo-rec-paper')
+    if d==dt.date(2026,9,1): adjust(d,'joint',600,'יתרת פתיחה',hour=8)
+    if dom==6 and d.month>=9: add(d,380,'home','ועד בית',hour=7,acct='joint')
     if dom==2: add(d,99,'home','אינטרנט',hour=7)
     if dom==5: add(d,21.90,'subs','ספוטיפיי',hour=6,acct='visa',rec='demo-rec-spotify'); add(d,54.90,'subs','נטפליקס',hour=6,acct='visa')
     if dom==8: add(d,11.90,'subs','iCloud',hour=6)
@@ -150,6 +152,8 @@ for i,(mo,dd) in enumerate([(5,1),(6,1),(7,2),(8,1),(8,31)]):
     if mo==6: put('a','ibkr','IBKR','trading',ib*1.03,ms(dt.date(2026,6,17),22,5))
     if mo==7: delete('a','oldsave',ms(dt.date(2026,7,15),19,40)); put('a','emergency','קרן חירום','deposit',AS['emergency']['value']+8000,ms(dt.date(2026,7,15),19,45))
 # after the last full update (Aug 31): only some items get updated → others become "not updated for over a month"
+# נקודות נרשמות לפי הערכים באותו רגע בקוד, ולכן אירוע של ספטמבר בא אחרי העדכון המלא של סוף אוגוסט
+put('a','joint','עו"ש משותף','checking',0,ms(dt.date(2026,9,1),8,30))
 put('a','ibkr','IBKR','trading',AS['ibkr']['value']*0.97,ms(dt.date(2026,9,14),21,0))
 put('a','ibkr','IBKR','trading',AS['ibkr']['value']*1.025,ms(dt.date(2026,10,9),22,40))
 
@@ -174,7 +178,7 @@ rec=[tmpl('rent','expense',4800,'home','שכירות',1,'2026-04','2026-11','che
      tmpl('laptop','expense',900,'shop','מחשב נייד',9,'2026-06','2026-11','visa',count=6,total=5400,paid=5400),   # הסתיים
      tmpl('fridge','expense',300,'home','מקרר',20,'2026-09','2026-10','visa',count=12,total=3600,paid=600)]         # 2 מתוך 12
 assert len({p['t'] for p in hist})==len(hist)
-data={'app':'personal-finance-dashboard','version':2,'exportedAt':dt.datetime(2026,11,13,22,50,tzinfo=TZ).isoformat(),
+data={'app':'personal-finance-dashboard','version':2,'exportedAt':dt.datetime(2026,11,14,9,30,tzinfo=TZ).isoformat(),
       'tx':{'categories':categories,'transactions':tx},
       'nw':{'assets':list(AS.values()),'liabilities':list(LI.values()),'history':hist},'rec':rec}
 import os,sys
