@@ -177,6 +177,18 @@ h2.h{font-size:15px;font-weight:650;color:var(--ink-2)}
 .chips.line.desc-sugg{margin-top:8px}
 .desc-sugg .chip{padding:6px 11px;font-size:13.5px}
 .sugg-tag{font-weight:500;color:var(--accent);font-size:12.5px}
+/* מועדפים (1.0.8): שורה בראש חלון ההוספה, ודף ניהול בהגדרות */
+.chips.line.fav-chips{margin-top:10px}
+.fav-chips .chip{padding:6px 11px;font-size:13.5px;gap:5px}
+.fav-amt{font-weight:500;color:var(--ink-2);font-size:12.5px}
+.fav-tg{margin-top:14px}
+.fav-li{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line)}
+.fav-li .tx-row{border-bottom:0;flex:1;min-width:0}
+.fav-li .tx-title,.fav-li .tx-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fav-mv{display:flex;flex-direction:column;flex:none}
+.fav-mv button{width:34px;height:26px;display:grid;place-items:center;color:var(--ink-2);font-size:12px;border-radius:8px}
+.fav-mv button:disabled{opacity:.25}
+.fav-mv button:active{background:var(--sunk)}
 .tx-row.dim{opacity:.55}
 .inst-row{display:flex;align-items:center;gap:10px;margin-top:10px}
 .inst-row .input{width:90px;text-align:center}
@@ -507,8 +519,9 @@ const S={
   tx:{categories:[],transactions:[]},
   nw:{assets:[],liabilities:[],history:[]},
   rec:[],
+  fav:[],   // 1.0.8: מועדפים (favorites)
   view:'home',month:monthKey(new Date()),txType:'all',txCat:null,txAcct:null,txQ:'',range:'all',
-  catTab:'expense',histOpen:false,brkOpen:false,setPage:null,newVer:false,live:false,early:false,earlyWrites:0,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
+  catTab:'expense',favTab:'expense',histOpen:false,brkOpen:false,setPage:null,newVer:false,live:false,early:false,earlyWrites:0,form:null,ready:false,user:null,loaded:{},quick:false,noAccess:false,verifyNote:'',monthLoaded:{},monthCache:{}
 };
 
 /* ================= storage ================= */
@@ -547,6 +560,14 @@ function normRec(a){
     r.type==='transfer'?{fromId:String(r.fromId||''),toId:String(r.toId||'')}:{},
     num(r.count)>1?Object.assign({count:Math.round(num(r.count)),total:r2(num(r.total))},r.paid!=null&&isFinite(+r.paid)?{paid:r2(+r.paid)}:{}):{}));
 }
+/* מועדף (1.0.8): תנועה מוכנה למילוי בחלון ההוספה. amount=0 = בלי סכום. רק הוצאה/הכנסה. ord = הסדר שנקבע בדף הניהול */
+function normFav(a){
+  const num=v=>isFinite(+v)?+v:0;
+  return (Array.isArray(a)?a:[]).filter(x=>x&&x.id&&(x.type==='expense'||x.type==='income')).map(x=>Object.assign({
+    id:String(x.id),type:x.type,note:String(x.note||''),categoryId:x.categoryId?String(x.categoryId):null,catName:String(x.catName||''),
+    amount:Math.max(0,r2(num(x.amount))),ord:num(x.ord),createdAt:num(x.createdAt)},
+    x.accountId?{accountId:String(x.accountId)}:{})).sort((p,q)=>p.ord-q.ord||p.createdAt-q.createdAt);
+}
 function normNw(o){
   o=o||{};
   const num=v=>isFinite(+v)?+v:0;
@@ -575,12 +596,12 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.7',APP_BUILD='b6',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.8',APP_BUILD='b1',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
-const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
+const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring','favorites'];
 
 /* ================= firebase (נתונים + התחברות) ================= */
-const LOAD_KEYS=['profile','categories','month','recent','assets','liabilities','history','recurring'];
+const LOAD_KEYS=['profile','categories','month','recent','assets','liabilities','history','recurring','favorites'];
 
 /* ---------- תנועות: טעינה לפי צורך ----------
    התנועות נטענות ממספר מקורות קטנים: החודש הנוכחי, החודש שמוצג במסך התנועות, ו-10 האחרונות.
@@ -619,7 +640,7 @@ function saveSnapSoon(){
       const cur=monthKey(new Date()),keep=new Set(TXS.src.recent?TXS.src.recent.keys():[]);
       localStorage.setItem(SNAP_KEY,JSON.stringify({v:1,uid:S.user.uid,email:S.user.email||'',t:Date.now(),
         cats:S.tx.categories,tx:S.tx.transactions.filter(t=>t.date.slice(0,7)===cur||keep.has(t.id)),
-        assets:S.nw.assets,liabs:S.nw.liabilities,hist:S.nw.history,rec:S.rec}));
+        assets:S.nw.assets,liabs:S.nw.liabilities,hist:S.nw.history,rec:S.rec,fav:S.fav}));
     }catch(e){console.warn(e);}
   },800);
 }
@@ -635,6 +656,7 @@ function enterEarly(snap){
   txSource('snap',snap.tx);   // מקור זמני, עד שהתנועות האמיתיות מגיעות
   S.nw=normNw({assets:snap.assets,liabilities:snap.liabs,history:snap.hist});
   S.rec=normRec(snap.rec);
+  S.fav=normFav(snap.fav);
   S.monthLoaded[monthKey(new Date())]=true;
   S.ready=true;mark('view');render();
   if(S.quick){S.quick=false;openTxSheet();}
@@ -735,6 +757,7 @@ const D={
     this.listen('liabilities',a=>{S.nw.liabilities=normNw({liabilities:a}).liabilities;});
     this.listen('history',a=>{S.nw.history=normNw({history:a}).history;});
     this.listen('recurring',a=>{S.rec=normRec(a);});
+    this.listen('favorites',a=>{S.fav=normFav(a);});
     this.setMonths(wantedMonths());
   },
   monthSubs:{},
@@ -813,6 +836,10 @@ const D={
     (fx||[]).forEach(e=>ops.push({ref:this.ref(this.itemCol(e.kind),e.id),update:true,data:{value:this.F.increment(e.d)}}));
     this.w(this.runOps(ops));
   },
+  /* מועדפים. ops מרובים (שינוי סדר) עוברים דרך runOps */
+  putFav(x){const {id,...r}=x;this.w(this.F.setDoc(this.ref('favorites',id),r));},
+  delFav(id){this.w(this.F.deleteDoc(this.ref('favorites',id)));},
+  favOrd(list){this.w(this.runOps(list.map(x=>({ref:this.ref('favorites',x.id),update:true,data:{ord:x.ord}}))));},
   updRec(id,data){this.w(this.F.updateDoc(this.ref('recurring',id),data));},
   delRec(id){this.w(this.F.deleteDoc(this.ref('recurring',id)));},
   async recPaidSum(id){
@@ -891,12 +918,13 @@ const D={
     };
     await Promise.all(Array.from({length:Math.min(PAR,chunks.length)},worker));
   },
-  async importAll(tx,nw,rec,catBudgets){
+  async importAll(tx,nw,rec,catBudgets,favs){
     syncBegin();
-    try{await this._importAll(tx,nw,rec,catBudgets);}finally{syncEnd();}
+    try{await this._importAll(tx,nw,rec,catBudgets,favs);}finally{syncEnd();}
   },
-  async _importAll(tx,nw,rec,catBudgets){
+  async _importAll(tx,nw,rec,catBudgets,favs){
     const ops=[];
+    (favs||[]).forEach(x=>{const {id,...d}=x;ops.push({ref:this.ref('favorites',id),data:d});});
     (rec||[]).forEach(r=>{const {id,...d}=r;ops.push({ref:this.ref('recurring',id),data:d});});
     (catBudgets||[]).forEach(b=>ops.push({ref:this.ref('categories',b.id),update:true,data:{budgets:b.budgets}}));
     tx.categories.forEach(c=>{const {id,...r}=c;ops.push({ref:this.ref('categories',id),data:r});});
@@ -918,6 +946,7 @@ const D={
     old.liabs.forEach(id=>ops.push({ref:this.ref('liabilities',id),del:true}));
     old.hist.forEach(id=>ops.push({ref:this.ref('history',id),del:true}));
     (old.recs||[]).forEach(id=>ops.push({ref:this.ref('recurring',id),del:true}));
+    (old.favs||[]).forEach(id=>ops.push({ref:this.ref('favorites',id),del:true}));
     cats.forEach(c=>{const {id,...r}=c;ops.push({ref:this.ref('categories',id),data:r});});
     try{await this.runOps(ops);}catch(e){console.error(e);toast('המחיקה לא הושלמה. נסו שוב'+errTag(e),'err');}
   },
@@ -1991,11 +2020,13 @@ function viewSettings(){
   const back='<button class="link row" style="gap:2px;margin:-6px -6px 10px" data-a="set-back">'+ICON.chevR+'הגדרות</button>';
   if(S.setPage==='rec')return back+recSection();
   if(S.setPage==='cats')return back+catsSection();
+  if(S.setPage==='favs')return back+favSection();
   const act=S.rec.filter(r=>!r.paused&&!recDone(r)).length;
   const nExp=S.tx.categories.filter(c=>c.type==='expense').length,nInc=S.tx.categories.length-nExp;
   const email=S.user&&S.user.email?S.user.email:'';
   return '<div class="surface list" style="margin-top:4px">'+
       setRow('rec','🔁','#3F6FB5','תנועות חוזרות ותשלומים',S.rec.length?(act===1?'אחת פעילה':act+' פעילות'):'שכירות, משכורת, מנויים, תשלומים')+
+      setRow('favs','⭐','#C9A12E','מועדפים',S.fav.length?(S.fav.length===1?'מועדף אחד':S.fav.length+' מועדפים'):'מילוי מהיר של מה שחוזר על עצמו')+
       setRow('cats','🏷️','#B3568A','קטגוריות',nExp+' הוצאות · '+nInc+' הכנסות')+'</div>'+
     '<div class="surface list">'+
       setRow('theme','🌗','#7153A8','מראה',THEME_NAMES[getTheme()])+
@@ -2043,7 +2074,7 @@ function render(){
   const ae=document.activeElement,keepQ=ae&&ae.id==='tx-search'?[ae.selectionStart,ae.selectionEnd]:null;
   $('#view').innerHTML=bannerHtml()+views[S.view]();
   if(keepQ){const i=$('#tx-search');if(i){try{i.focus({preventScroll:true});i.setSelectionRange(keepQ[0],keepQ[1]);}catch(err){}}}
-  $('#top-title').textContent=S.view==='settings'&&S.setPage?{rec:'תנועות חוזרות',cats:'קטגוריות'}[S.setPage]:TITLES[S.view];
+  $('#top-title').textContent=S.view==='settings'&&S.setPage?{rec:'תנועות חוזרות',cats:'קטגוריות',favs:'מועדפים'}[S.setPage]:TITLES[S.view];
   $('#top-sub').textContent=S.view==='home'?F.dayLong.format(new Date()):'\u00a0';
   $$('.tab').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
   const pts=rangePoints();
@@ -2060,6 +2091,7 @@ function openTxSheet(id){
     accountId:t?(t.accountId||null):lastAcct('expense'),fromId:t?(t.fromId||null):lastAcct('expense'),toId:t&&t.toId||null,repeat:'once'};
   const html=sheetHead(t?'עריכת תנועה':'הוספה מהירה')+
     '<div class="seg" id="f-type"><button data-a="f-type" data-v="expense">הוצאה</button><button data-a="f-type" data-v="income">הכנסה</button><button data-a="f-type" data-v="transfer">העברה</button></div>'+
+    (t?'':'<div class="chips line fav-chips" id="f-favs" hidden></div>')+
     '<label class="amount-wrap" id="f-amount-wrap"><span class="cur">₪</span><input id="f-amount" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" aria-label="סכום" value="'+(t?t.amount:'')+'"></label>'+
     '<div class="field-label">תיאור</div><input id="f-note" class="input" placeholder="למשל: קפה עם דני" enterkeyhint="done" autocomplete="off" autocorrect="off" spellcheck="false" value="'+esc(t?t.note:'')+'">'+
     (t?'':'<div class="chips line desc-sugg" id="f-desc-sugg" hidden></div>')+
@@ -2074,7 +2106,8 @@ function openTxSheet(id){
       '<button class="chip on" data-a="f-rep" data-v="once">פעם אחת</button><button class="chip" data-a="f-rep" data-v="monthly">🔁 כל חודש</button>'+
       '<button class="chip" data-a="f-rep" data-v="inst" id="f-rep-inst">בתשלומים</button></div>'+
       '<div class="inst-row" id="f-inst-row" hidden><span>מספר תשלומים</span><input id="f-inst" class="input" inputmode="numeric" autocomplete="off" value="3" aria-label="מספר תשלומים"></div>'+
-      '<p class="hint" id="f-rep-hint"></p></div>')+
+      '<p class="hint" id="f-rep-hint"></p></div>'+
+      '<div class="fav-tg" id="f-fav-sec"><button class="chip" data-a="f-fav-tg" id="f-fav-tg"></button><p class="hint" id="f-fav-hint" hidden></p></div>')+
     '<div class="sheet-actions">'+(t?'<button class="btn ghost danger" data-a="tx-del">מחיקה</button>':'')+'<button class="btn primary grow" data-a="tx-save" data-primary>'+(t?'שמירת שינויים':'שמירה')+'</button></div>';
   openSheet(html);
   syncTxType();syncDateChips();
@@ -2127,7 +2160,7 @@ function syncTxType(){
   const w=$('#f-amount-wrap');if(w)w.className='amount-wrap '+cls;
   $('#f-cat-sec').hidden=v==='transfer';$('#f-xfer-sec').hidden=v!=='transfer';
   if(v==='transfer')renderXferChips();else renderCatChips();
-  renderAcctChips();syncRep();
+  renderAcctChips();syncRep();renderFavChips();syncFavTg();
 }
 /* חזרה: פעם אחת / כל חודש / בתשלומים (תשלומים רק בהוצאה). רק בתנועה חדשה */
 function syncRep(){
@@ -2160,7 +2193,7 @@ function renderCatChips(){
   box.innerHTML=(all.length?'':'<span class="muted small" style="align-self:center">עוד אין קטגוריות מסוג זה.</span>')+
     cats.map(c=>'<button class="chip '+(f.categoryId===c.id?'on':'')+'" style="--c:'+c.color+'" data-a="f-cat" data-id="'+esc(c.id)+'">'+esc(c.icon)+' '+esc(c.name)+'</button>').join('')+
     '<button class="chip add" data-a="f-newcat">＋ חדשה</button>';
-  scrollToOn(box);syncBudgetHint();
+  scrollToOn(box);syncBudgetHint();syncFavTg();
 }
 function syncDateChips(){
   const d=S.form.date;
@@ -2207,7 +2240,8 @@ function saveTx(){
   if(!xfer)setLastAcct(f.type,f.accountId);
   if(!xfer)suggLearnSaved(fields);
   if(!xfer&&!f.id)bumpCatUse(f.categoryId);
-  if(!f.id&&f.repeat!=='once'){saveRecurringNew(f,fields,date);return;}
+  const fav=!xfer&&!f.id&&f.favOn?upsertFav(fields):null;   // "☆ גם כמועדף"
+  if(!f.id&&f.repeat!=='once'){saveRecurringNew(f,fields,date,fav);return;}
   const edited=!!f.id,tid=t.id;
   let over='';
   if(!edited&&!xfer&&f.type==='expense'&&active){
@@ -2229,12 +2263,13 @@ function saveTx(){
       S.tx.transactions=S.tx.transactions.filter(x=>x.id!==tid);
       delTxFx(t);render();toast('ההוספה בוטלה');
     };
-  toast(!active?'נשמר ב'+monthName(mk):edited?'השינויים נשמרו':xfer?'ההעברה נשמרה':(f.type==='income'?'ההכנסה נשמרה':'ההוצאה נשמרה'+over),'',undo);
+  toast((!active?'נשמר ב'+monthName(mk):edited?'השינויים נשמרו':xfer?'ההעברה נשמרה':(f.type==='income'?'ההכנסה נשמרה':'ההוצאה נשמרה'+over))+(fav?' · '+fav.msg:''),'',
+    fav?()=>{undo();fav.undo();}:undo);
 }
 
 /* תבנית חדשה (כל חודש / תשלומים). כל החודשים שהיום שלהם כבר הגיע נוצרים מיד, באותה שמירה
    (תבנית חדשה עוד לא מוכרת למכשיר אחר, ולכן אין סכנת כפילות, וזה עובד גם בלי חיבור) */
-function saveRecurringNew(f,fields,date){
+function saveRecurringNew(f,fields,date,fav){
   const mk=date.slice(0,7),inst=f.repeat==='inst',n=inst?parseInt($('#f-inst').value,10):0,cur=monthKey(new Date());
   const {date:_d,...base}=fields;
   const r=Object.assign({id:uid()},base,{day:+date.slice(8),startMonth:mk,lastMonth:null,paused:false,createdAt:Date.now()},
@@ -2252,10 +2287,140 @@ function saveRecurringNew(f,fields,date){
   let where='';
   if(!txs.length)where=', '+what+' ב־'+dayShort(date);
   else if(mk!==cur)where=', '+what+' ב'+monthName(mk)+(txs.length>1?' (נוצרו '+txs.length+')':'');
-  toast((inst?'נשמר ב־'+n+' תשלומים':'נשמרה כתנועה חוזרת')+where,'',()=>{
+  toast((inst?'נשמר ב־'+n+' תשלומים':'נשמרה כתנועה חוזרת')+where+(fav?' · '+fav.msg:''),'',()=>{
+    if(fav)fav.undo();
     S.rec=S.rec.filter(x=>x.id!==r.id);
     const ids=new Set(txs.map(t=>t.id));S.tx.transactions=S.tx.transactions.filter(x=>!ids.has(x.id));
     const back=negFx(fx);applyFxLocal(back);D.undoRec(r.id,txs,back);render();toast('בוטל');
+  });
+}
+
+/* ================= מועדפים (1.0.8) =================
+   מועדף = תנועה מוכנה: תיאור, קטגוריה, חשבון וסכום (0 = בלי). לחיצה בחלון ההוספה ממלאת את השדות ומחכה ל"שמירה".
+   נשמרים בענן (favorites), כדי שיופיעו בכל מכשיר. הסדר ידני (ord), נקבע בדף הניהול בהגדרות. רק הוצאה/הכנסה */
+const favsOf=type=>S.fav.filter(x=>x.type===type).sort((a,b)=>a.ord-b.ord||a.createdAt-b.createdAt);
+const favCat=x=>catOk(x.categoryId,x.type)?catView(x.categoryId):null;
+const favLabel=x=>x.note||(favCat(x)?favCat(x).name:x.catName)||'מועדף';
+const favNextOrd=()=>Math.max(0,...S.fav.map(x=>x.ord))+1;
+const favSame=(x,type,note,cid)=>x.type===type&&nkey(x.note)===nkey(note)&&(x.categoryId||null)===(cid||null);
+function renderFavChips(){
+  const f=S.form,box=$('#f-favs');if(!box||!f)return;
+  const list=f.type==='transfer'?[]:favsOf(f.type);
+  box.hidden=!list.length;
+  box.innerHTML=list.map(x=>{const c=favCat(x)||NONE;
+    return '<button class="chip'+(f.favId===x.id?' on':'')+'" style="--c:'+c.color+'" data-a="f-fav" data-id="'+esc(x.id)+'">'+esc(c.icon)+' '+esc(favLabel(x))+
+      (x.amount>0?' <span class="fav-amt num">'+money(x.amount,{dec:true})+'</span>':'')+'</button>';}).join('');
+  scrollToOn(box);
+}
+/* לחיצה על מועדף: ממלאת תיאור, קטגוריה, חשבון וסכום (אם נשמר). התאריך לא משתנה. לא שומרת */
+function pickFav(id){
+  const f=S.form,x=S.fav.find(y=>y.id===id);if(!f||!x||f.kind!=='tx'||f.id||x.type!==f.type)return;
+  f.favId=x.id;
+  const note=$('#f-note'),amt=$('#f-amount');
+  note.value=x.note;
+  // קטגוריה או חשבון שנמחקו: השדה נשאר ריק
+  f.categoryId=catOk(x.categoryId,f.type)?x.categoryId:null;f.catManual=true;f.catSugg=false;
+  f.accountId=x.accountId&&isLive(acctOf(x.accountId))?x.accountId:null;f.acctManual=true;f.acctSugg=false;
+  if(x.amount>0){amt.value=String(x.amount);sizeAmount(amt);}
+  renderFavChips();renderCatChips();renderAcctChips();syncSugg();syncSuggHints();syncRep();syncFavTg();
+  if(x.amount>0){const ae=document.activeElement;if(ae&&ae.blur&&ae.id==='f-amount')ae.blur();}
+  else focusEl(amt);
+  [note,$('#f-cats .chip.on'),$('#f-accts .chip.on')].forEach(el=>{if(!el)return;el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');});
+}
+/* "☆ גם כמועדף" בחלון ההוספה (תנועה חדשה, הוצאה/הכנסה) */
+function syncFavTg(){
+  const f=S.form,sec=$('#f-fav-sec'),b=$('#f-fav-tg'),h=$('#f-fav-hint');if(!f||!sec||!b)return;
+  sec.hidden=f.type==='transfer';
+  b.className='chip'+(f.favOn?' on':'');
+  b.textContent=f.favOn?'★ יישמר גם כמועדף':'☆ גם כמועדף';
+  const hit=f.favOn&&S.fav.find(x=>favSame(x,f.type,$('#f-note').value.trim(),f.categoryId));
+  h.hidden=!f.favOn;
+  h.textContent=!f.favOn?'':hit?'יש כבר מועדף עם אותו תיאור וקטגוריה. הוא יתעדכן לסכום ולחשבון שכאן.':'יופיע בראש החלון הזה, עם התיאור, הקטגוריה, החשבון והסכום. אפשר לשנות בהגדרות ← מועדפים.';
+}
+/* שמירה מחלון ההוספה: אותו סוג+תיאור+קטגוריה מעדכן את המועדף הקיים במקום ליצור כפילות. מחזיר {msg,undo} */
+function upsertFav(fl){
+  const data=Object.assign({type:fl.type,note:fl.note,categoryId:fl.categoryId,catName:fl.catName,amount:fl.amount},fl.accountId?{accountId:fl.accountId}:{});
+  const hit=S.fav.find(x=>favSame(x,fl.type,fl.note,fl.categoryId));
+  if(hit){
+    const prev=Object.assign({},hit);
+    Object.keys(hit).forEach(k=>delete hit[k]);Object.assign(hit,{id:prev.id,ord:prev.ord,createdAt:prev.createdAt},data);
+    D.putFav(hit);
+    return{msg:'המועדף עודכן',undo:()=>{const y=S.fav.find(z=>z.id===prev.id);if(y){Object.keys(y).forEach(k=>delete y[k]);Object.assign(y,prev);}D.putFav(prev);}};
+  }
+  const x=Object.assign({id:uid(),ord:favNextOrd(),createdAt:Date.now()},data);
+  S.fav.push(x);D.putFav(x);
+  return{msg:'נוסף למועדפים',undo:()=>{S.fav=S.fav.filter(y=>y.id!==x.id);D.delFav(x.id);}};
+}
+/* הגדרות ← מועדפים: רשימה לפי סוג, עם חצים לשינוי הסדר */
+function favSection(){
+  const type=S.favTab,list=favsOf(type);
+  return '<div class="seg" style="margin-bottom:10px"><button data-a="fav-tab" data-v="expense" class="'+(type==='expense'?'on exp':'')+'">הוצאות</button><button data-a="fav-tab" data-v="income" class="'+(type==='income'?'on inc':'')+'">הכנסות</button></div>'+
+    '<div class="surface list">'+(list.length?list.map((x,i)=>{
+      const c=favCat(x)||NONE,a=x.accountId?acctOf(x.accountId):null;
+      const sub=[esc(favCat(x)?c.name:(x.catName?x.catName+' (נמחקה)':'בלי קטגוריה')),a?esc(a.x.name):(x.accountId?'חשבון שנמחק':'')].filter(Boolean).join(' · ');
+      return '<div class="fav-li"><button class="tx-row" data-a="fav-edit" data-id="'+esc(x.id)+'"><span class="ic" style="--c:'+c.color+'">'+esc(c.icon)+'</span>'+
+        '<span class="tx-main"><span class="tx-title">'+esc(favLabel(x))+'</span><span class="tx-sub">'+sub+'</span></span>'+
+        '<span class="tx-amt'+(type==='income'?' pos':'')+'">'+(x.amount>0?money(x.amount,{dec:true}):'<span class="muted small">בלי סכום</span>')+'</span></button>'+
+        '<span class="fav-mv"><button data-a="fav-mv" data-v="-1" data-id="'+esc(x.id)+'" aria-label="למעלה"'+(i?'':' disabled')+'>▲</button><button data-a="fav-mv" data-v="1" data-id="'+esc(x.id)+'" aria-label="למטה"'+(i<list.length-1?'':' disabled')+'>▼</button></span></div>';
+    }).join(''):'<div class="empty">קפה, דלק, סופר, משכורת: מה שחוזר על עצמו. לחיצה על מועדף בחלון ההוספה ממלאת את הפרטים, ונשאר רק ללחוץ "שמירה".</div>')+
+    '<button class="add-row" data-a="fav-add">＋ מועדף חדש</button></div>'+
+    (list.length>1?'<p class="hint">זה הסדר בחלון ההוספה. החצים מזיזים למעלה ולמטה.</p>':'')+
+    '<p class="hint">אפשר להוסיף גם מחלון ההוספה: "☆ גם כמועדף" לפני השמירה.</p>';
+}
+function moveFav(id,dir){
+  const x=S.fav.find(y=>y.id===id);if(!x)return;
+  const list=favsOf(x.type),i=list.indexOf(x),j=i+dir;if(j<0||j>=list.length)return;
+  // הסדרים הקיימים נשארים, רק מתחלפים. אם יש כפולים (למשל אחרי ייבוא), ממספרים מחדש
+  let ords=list.map(y=>y.ord).sort((a,b)=>a-b);
+  if(new Set(ords).size<ords.length)ords=list.map((_,k)=>favNextOrd()+k);
+  [list[i],list[j]]=[list[j],list[i]];
+  const changed=[];list.forEach((y,k)=>{if(y.ord!==ords[k]){y.ord=ords[k];changed.push({id:y.id,ord:y.ord});}});
+  if(changed.length)D.favOrd(changed);
+  render();
+}
+function openFavSheet(id){
+  const x=id?S.fav.find(y=>y.id===id):null;if(id&&!x)return;
+  const type=x?x.type:S.favTab;
+  S.form={kind:'fav',id:x?x.id:null,type,categoryId:x&&catOk(x.categoryId,type)?x.categoryId:null,
+    accountId:x?(x.accountId&&isLive(acctOf(x.accountId))?x.accountId:null):lastAcct(type)};
+  openSheet(sheetHead(x?'עריכת מועדף':'מועדף חדש')+
+    '<div class="seg" id="fv-type"><button data-a="fv-type" data-v="expense">הוצאה</button><button data-a="fv-type" data-v="income">הכנסה</button></div>'+
+    '<label class="amount-wrap" id="fv-amount-wrap"><span class="cur">₪</span><input id="fv-amount" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" aria-label="סכום" value="'+(x&&x.amount>0?x.amount:'')+'"></label>'+
+    '<p class="hint" style="text-align:center;margin-top:0">סכום לא חובה. בלי סכום, מקלידים אותו בכל פעם.</p>'+
+    '<div class="field-label">תיאור</div><input id="fv-note" class="input" placeholder="למשל: קפה" enterkeyhint="done" autocomplete="off" autocorrect="off" spellcheck="false" value="'+esc(x?x.note:'')+'">'+
+    '<div id="f-cat-sec"><div class="field-label">קטגוריה</div><div class="chips block" id="f-cats"></div>'+
+    '<div class="newcat" id="f-newcat" hidden><input id="f-newcat-icon" class="input emoji-in" maxlength="8" value="🏷️" aria-label="אייקון"><input id="f-newcat-name" class="input grow" placeholder="שם הקטגוריה" enterkeyhint="done"><button class="btn primary" style="padding:12px 16px" data-a="f-newcat-save">הוספה</button></div></div>'+
+    '<div id="f-acct-sec"><div class="field-label" id="f-acct-label"></div><div class="chips line" id="f-accts"></div></div>'+
+    '<div class="sheet-actions">'+(x?'<button class="btn ghost danger" data-a="fav-del">מחיקה</button>':'')+'<button class="btn primary grow" data-a="fav-save" data-primary>'+(x?'שמירת שינויים':'הוספה')+'</button></div>');
+  syncFavForm();
+  sizeAmount($('#fv-amount'));
+  if(!x)focusEl($('#fv-note'));
+}
+function syncFavForm(){
+  const f=S.form;if(!f||f.kind!=='fav')return;
+  const cls=f.type==='expense'?'exp':'inc';
+  $$('#fv-type button').forEach(b=>{b.className=b.dataset.v===f.type?'on '+cls:'';});
+  $('#fv-amount-wrap').className='amount-wrap '+cls;
+  renderCatChips();renderAcctChips();
+}
+function saveFav(){
+  const f=S.form;if(!f||f.kind!=='fav')return;
+  const raw=$('#fv-amount').value.trim(),amount=raw?parseAmount(raw):0;
+  if(raw&&!(amount>0)){toast('הסכום לא תקין. אפשר גם להשאיר ריק');focusEl($('#fv-amount'));return;}
+  if(!f.categoryId||!catOk(f.categoryId,f.type)){toast('צריך לבחור קטגוריה');return;}
+  const note=$('#fv-note').value.trim();
+  if(S.fav.some(y=>y.id!==f.id&&favSame(y,f.type,note,f.categoryId))){toast('כבר יש מועדף עם אותו תיאור וקטגוריה');return;}
+  const data=Object.assign({type:f.type,note,categoryId:f.categoryId,catName:catView(f.categoryId).name,amount},f.accountId&&isLive(acctOf(f.accountId))?{accountId:f.accountId}:{});
+  const old=f.id?S.fav.find(y=>y.id===f.id):null;
+  if(f.id&&!old)return;
+  const x=Object.assign({id:old?old.id:uid(),ord:old?old.ord:favNextOrd(),createdAt:old?old.createdAt:Date.now()},data);
+  const prev=old?Object.assign({},old):null;
+  S.fav=S.fav.filter(y=>y.id!==x.id).concat([x]);
+  D.putFav(x);S.favTab=x.type;closeSheet();render();
+  toast(prev?'המועדף נשמר':'המועדף נוסף','',()=>{
+    S.fav=S.fav.filter(y=>y.id!==x.id);
+    if(prev){S.fav.push(prev);D.putFav(prev);}else D.delFav(x.id);
+    render();toast(prev?'השינויים בוטלו':'ההוספה בוטלה');
   });
 }
 
@@ -2503,7 +2668,7 @@ async function doExport(){
   try{
     all=await withRetry(()=>D.allTx(),'החיבור איטי, מנסה שוב…');
   }catch(e){console.error(e);toast('אין חיבור לאינטרנט. נסו שוב'+errTag(e),'err');return;}
-  const data={app:'personal-finance-dashboard',version:2,exportedAt:new Date().toISOString(),tx:{categories:S.tx.categories,transactions:all},nw:S.nw,rec:S.rec};
+  const data={app:'personal-finance-dashboard',version:2,exportedAt:new Date().toISOString(),tx:{categories:S.tx.categories,transactions:all},nw:S.nw,rec:S.rec,fav:S.fav};
   const name='finance-backup-'+todayStr()+'.json';
   const file=new File([JSON.stringify(data,null,2)],name,{type:'application/json'});
   S.form={kind:'export',file};
@@ -2543,13 +2708,14 @@ function downloadExport(file,afterShareFail){
    מוסיף רק מה שחסר. לא מוחק ולא דורס: כשפריט קיים גם בחשבון וגם בגיבוי, הגרסה שבחשבון נשמרת.
    "קיים" = אותו מזהה, ואם אין מזהה תואם, אותו תוכן (שם/תאריך/סכום/הערה). */
 const nkey=v=>String(v==null?'':v).trim().replace(/\s+/g,' ').toLowerCase();
+const favKey=x=>x.type+'|'+nkey(x.note)+'|'+nkey(x.catName);
 const txKey=t=>t.type+'|'+t.date+'|'+r2(+t.amount)+'|'+nkey(t.note);
 const histDay=t=>{const d=new Date(+t);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();};
-function planImport(bTx,bNw,cur,bRec){
-  const add={categories:[],transactions:[],assets:[],liabilities:[],history:[],recurring:[],catBudgets:[]};
+function planImport(bTx,bNw,cur,bRec,bFav){
+  const add={categories:[],transactions:[],assets:[],liabilities:[],history:[],recurring:[],catBudgets:[],favorites:[]};
   // קטגוריה שכבר קיימת (למשל קטגוריות ברירת המחדל בחשבון חדש) ואין לה תקציב: התקציב מהגיבוי מתווסף. תקציב קיים לא נדרס
   const takeBudget=(have,c)=>{if(have&&c.budgets&&have.type==='expense'&&!have.budgets)add.catBudgets.push({id:have.id,budgets:c.budgets});};
-  const st={catsLinked:0,txSkip:0,itemsSkip:0,histSkip:0,recSkip:0};
+  const st={catsLinked:0,txSkip:0,itemsSkip:0,histSkip:0,recSkip:0,favSkip:0};
   // קטגוריות: לפי מזהה, אחר כך לפי סוג+שם
   const catIds=new Set(cur.cats.map(c=>c.id)),catByKey=new Map(cur.cats.map(c=>[c.type+'|'+nkey(c.name),c])),catMap=new Map();
   for(const c of bTx.categories){
@@ -2596,11 +2762,20 @@ function planImport(bTx,bNw,cur,bRec){
     const cid=r.categoryId&&catMap.has(r.categoryId)?catMap.get(r.categoryId):null;
     add.recurring.push(Object.assign({},r,{categoryId:cid}));rIds.add(r.id);rKeys.add(recKey(r));
   }
-  const total=add.categories.length+add.transactions.length+add.assets.length+add.liabilities.length+add.history.length+add.recurring.length+add.catBudgets.length;
+  // מועדפים: לפי מזהה, אחר כך לפי סוג+תיאור+שם קטגוריה. הקיים מנצח. מתווספים בסוף הרשימה, בסדר שבגיבוי
+  const fIds=new Set((cur.fav||[]).map(x=>x.id)),fKeys=new Set((cur.fav||[]).map(favKey));
+  let fOrd=Math.max(0,...(cur.fav||[]).map(x=>x.ord));
+  for(const x of (bFav||[])){
+    const cid=x.categoryId&&catMap.has(x.categoryId)?catMap.get(x.categoryId):null,c=cid?catById.get(cid):null;
+    const y=Object.assign({},x,{categoryId:cid,catName:c?c.name:x.catName});
+    if(fIds.has(x.id)||fKeys.has(favKey(y))){st.favSkip++;continue;}
+    y.ord=++fOrd;add.favorites.push(y);fIds.add(y.id);fKeys.add(favKey(y));
+  }
+  const total=add.categories.length+add.transactions.length+add.assets.length+add.liabilities.length+add.history.length+add.recurring.length+add.catBudgets.length+add.favorites.length;
   return{add,st,total};
 }
 function isPristine(cur){
-  if(cur.tx.length||cur.assets.length||cur.liabs.length||cur.hist.length||(cur.rec||[]).length)return false;
+  if(cur.tx.length||cur.assets.length||cur.liabs.length||cur.hist.length||(cur.rec||[]).length||(cur.fav||[]).length)return false;
   if(cur.cats.length!==DEFAULT_CATS.length)return false;
   const def=new Set(DEFAULT_CATS.map(([name,icon,type])=>type+'|'+nkey(name)));
   return cur.cats.every(c=>def.has(c.type+'|'+nkey(c.name)));
@@ -2614,13 +2789,14 @@ function importSummary(plan){
   row('נכסים והתחייבויות',a.assets.length+a.liabilities.length,st.itemsSkip);
   row('נקודות בגרף',a.history.length,st.histSkip);
   row('תנועות חוזרות',a.recurring.length,st.recSkip);
+  row('מועדפים',a.favorites.length,st.favSkip);
   return rows.join('');
 }
 async function runImport(plan){
   toast('מייבא…','busy');
   try{
     const a=plan.add;
-    await D.importAll({categories:a.categories,transactions:a.transactions},{assets:a.assets,liabilities:a.liabilities,history:a.history},a.recurring,a.catBudgets);
+    await D.importAll({categories:a.categories,transactions:a.transactions},{assets:a.assets,liabilities:a.liabilities,history:a.history},a.recurring,a.catBudgets,a.favorites);
     toast('נוספו '+F.n0.format(plan.total)+' פריטים מהגיבוי');
     const o=suggMem();if(o){(a.transactions||[]).forEach(t=>suggLearn(t,t.createdAt||Date.parse(t.date)||0,o));suggSave();}
   }catch(e){console.error(e);toast('הייבוא לא הושלם. אפשר לייבא שוב, מה שכבר נוסף ידולג'+errTag(e),'err');}
@@ -2635,8 +2811,8 @@ async function importFile(file){
   try{
     curTx=await withRetry(()=>D.allTx(),'החיבור איטי, מנסה שוב…');
   }catch(e){console.error(e);toast('הייבוא דורש חיבור לאינטרנט'+errTag(e),'err');return;}
-  const cur={cats:S.tx.categories,tx:curTx,assets:S.nw.assets,liabs:S.nw.liabilities,hist:S.nw.history,rec:S.rec};
-  const plan=planImport(bTx,bNw,cur,normRec(obj.rec));
+  const cur={cats:S.tx.categories,tx:curTx,assets:S.nw.assets,liabs:S.nw.liabilities,hist:S.nw.history,rec:S.rec,fav:S.fav};
+  const plan=planImport(bTx,bNw,cur,normRec(obj.rec),normFav(obj.fav));
   if(!plan.total){toast('כל מה שבגיבוי כבר קיים בחשבון');return;}
   // חשבון ריק (רק קטגוריות ברירת המחדל): אין מה לדרוס, מייבאים מיד
   if(isPristine(cur)){await runImport(plan);return;}
@@ -2656,7 +2832,7 @@ document.addEventListener('click',async e=>{
   switch(a){
     case 'nav':S.view=v;S.setPage=null;render();window.scrollTo(0,0);break;
     case 'set':
-      if(v==='rec'||v==='cats'){S.setPage=v;try{history.pushState({set:v},'');}catch(err){}render();window.scrollTo(0,0);}
+      if(v==='rec'||v==='cats'||v==='favs'){S.setPage=v;try{history.pushState({set:v},'');}catch(err){}render();window.scrollTo(0,0);}
       else if(v==='stats')openStatsSheet();else openSetSheet(v);
       break;
     case 'set-back':S.setPage=null;render();window.scrollTo(0,0);try{if(history.state&&history.state.set)history.back();}catch(err){}break;
@@ -2685,7 +2861,22 @@ document.addEventListener('click',async e=>{
     case 'range':S.range=v;render();break;
     case 'sheet-close':closeSheet();break;
 
-    case 'f-type':if(f&&f.type!==v){f.type=v;f.categoryId=null;f.catManual=f.catSugg=f.acctManual=f.acctSugg=false;if(!f.id&&v!=='transfer')f.accountId=lastAcct(v);syncTxType();syncSugg();syncSuggHints();}break;
+    case 'f-type':if(f&&f.type!==v){f.type=v;f.categoryId=null;f.favId=null;f.catManual=f.catSugg=f.acctManual=f.acctSugg=false;if(!f.id&&v!=='transfer')f.accountId=lastAcct(v);syncTxType();syncSugg();syncSuggHints();}break;
+    case 'f-fav':pickFav(id);break;
+    case 'f-fav-tg':if(f){f.favOn=!f.favOn;syncFavTg();}break;
+    case 'fav-tab':S.favTab=v;render();break;
+    case 'fav-add':openFavSheet();break;
+    case 'fav-edit':openFavSheet(id);break;
+    case 'fav-mv':moveFav(id,+v);break;
+    case 'fav-save':saveFav();break;
+    case 'fv-type':if(f&&f.kind==='fav'&&f.type!==v){f.type=v;f.categoryId=null;if(!f.id)f.accountId=lastAcct(v);syncFavForm();}break;
+    case 'fav-del':{
+      const x=f&&f.kind==='fav'&&S.fav.find(y=>y.id===f.id);if(!x)break;
+      const copy=Object.assign({},x);
+      S.fav=S.fav.filter(y=>y.id!==x.id);D.delFav(x.id);closeSheet();render();
+      toast('המועדף נמחק','',()=>{if(!S.fav.some(y=>y.id===copy.id))S.fav.push(copy);D.putFav(copy);render();toast('המועדף הוחזר');});
+      break;
+    }
     case 'f-acct':if(f){f.accountId=id||null;f.acctManual=true;f.acctSugg=false;renderAcctChips();syncSuggHints();}break;
     case 'f-desc':dbgNote('click '+v);pickDesc(v);break;
     case 'f-rep':if(f){f.repeat=v;syncRep();if(v==='inst')focusEl($('#f-inst'),true);}break;
@@ -2822,9 +3013,9 @@ document.addEventListener('click',async e=>{
       let txIds;
       try{txIds=await withRetry(()=>D.txIds(),'החיבור איטי, מנסה שוב…');}catch(err){console.error(err);toast('המחיקה דורשת חיבור לאינטרנט'+errTag(err),'err');break;}
       const old={cats:S.tx.categories.map(c=>c.id),txs:txIds,assets:S.nw.assets.map(x=>x.id),
-        liabs:S.nw.liabilities.map(x=>x.id),hist:S.nw.history.map(p=>String(p.t)),recs:S.rec.map(r=>r.id)};
+        liabs:S.nw.liabilities.map(x=>x.id),hist:S.nw.history.map(p=>String(p.t)),recs:S.rec.map(r=>r.id),favs:S.fav.map(x=>x.id)};
       const cats=defaultCats();
-      S.tx={categories:cats,transactions:[]};S.nw={assets:[],liabilities:[],history:[]};S.rec=[];
+      S.tx={categories:cats,transactions:[]};S.nw={assets:[],liabilities:[],history:[]};S.rec=[];S.fav=[];
       S.txCat=null;
       suggForget();D.wipe(old,cats);render();toast('כל הנתונים נמחקו');break;
     }
@@ -2833,7 +3024,7 @@ document.addEventListener('click',async e=>{
 document.addEventListener('input',e=>{
   const el=e.target;
   if(el.id==='n-value'){const nb=$('#n-neg');if(nb)nb.classList.toggle('on',/^\s*[-−]/.test(el.value));}
-  if(el.id==='f-amount'||el.id==='n-value')sizeAmount(el);
+  if(el.id==='f-amount'||el.id==='n-value'||el.id==='fv-amount')sizeAmount(el);
   if(el.id==='f-amount'||el.id==='f-inst')syncRep();
   if(el.classList&&el.classList.contains('bulk-in'))bulkTotal();
   if(el.id==='tx-search'){S.txQ=el.value;updateTxResults();}
@@ -2841,7 +3032,7 @@ document.addEventListener('input',e=>{
     dbgNote('input '+(e.inputType||'')+' "'+el.value+'"');
     const f=S.form,p=f&&f.pick;
     if(p&&Date.now()<p.until&&el.value===p.typed&&p.typed!==p.d){el.value=p.d;dbgNote('restored');}
-    syncSugg();
+    syncSugg();syncFavTg();
   }
 });
 /* יומן בדיקה (בטא בלבד): מה קורה בשדה התיאור ובכפתורי ההצעה, כדי להבין מה המקלדת של האייפון עושה */
