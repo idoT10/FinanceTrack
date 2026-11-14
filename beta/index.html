@@ -571,7 +571,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.7',APP_BUILD='b2',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.7',APP_BUILD='b3',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
@@ -1436,7 +1436,9 @@ function syncSugg(){
   const list=on?suggList(f.type,inp.value):[];
   f.descList=list;
   box.hidden=!list.length;
-  box.innerHTML=list.map((e,i)=>{const c=catView(e.c);return '<button class="chip" style="--c:'+c.color+'" data-a="f-desc" data-v="'+i+'">'+esc(c.icon)+' '+esc(e.d)+'</button>';}).join('');
+  // מחליפים את הכפתורים רק כשהרשימה באמת השתנתה: אחרת עדכון באמצע לחיצה (למשל כשהמקלדת נסגרת) מוחק את הכפתור שמתחת לאצבע
+  const html=list.map((e,i)=>{const c=catView(e.c);return '<button class="chip" style="--c:'+c.color+'" data-a="f-desc" data-v="'+i+'">'+esc(c.icon)+' '+esc(e.d)+'</button>';}).join('');
+  if(f.descHtml!==html){f.descHtml=html;box.innerHTML=html;}
 }
 /* לחיצה על תיאור מוצע: ממלאת את התיאור והקטגוריה (לא סכום). החשבון לפי אותו כלל של תיאור זהה */
 function pickDesc(i){
@@ -2821,6 +2823,8 @@ document.addEventListener('input',e=>{
   if(el.id==='tx-search'){S.txQ=el.value;updateTxResults();}
   if(el.id==='f-note')syncSugg();
 });
+/* לחיצה על תיאור מוצע לא מוציאה את הפוקוס מהשדה: המקלדת נשארת פתוחה והחלון לא זז באמצע הלחיצה */
+document.addEventListener('mousedown',e=>{if(e.target.closest&&e.target.closest('#f-desc-sugg .chip'))e.preventDefault();});
 document.addEventListener('focusin',e=>{
   const el=e.target;
   if(el.classList&&el.classList.contains('bulk-in'))setTimeout(()=>{try{el.select();}catch(err){}},0);
