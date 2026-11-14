@@ -549,7 +549,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.6',APP_BUILD='b5',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.6',APP_BUILD='b6',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
@@ -1258,6 +1258,31 @@ function runUndo(){
   if(fn)fn();
 }
 /* בסביבת הבדיקה מוסיפים להודעות שגיאה את קוד השגיאה (בייצור לא מציגים מונחים טכניים) */
+/* ---------- קריאה מהשרת עם ניסיון חוזר ----------
+   על נתונים ניידים החיבור הפתוח לשרת נתקע לפעמים בלי שגיאה, וקריאה פשוט לא נענית. ניסיון חדש פותח חיבור חדש ומצליח.
+   לכן: אם אין תשובה תוך NET_WAIT[0], מתחברים מחדש ומנסים פעם אחת נוספת (NET_WAIT[1]). רק אחריה מציגים שגיאה.
+   הספירה נשמרת בטלפון ומוצגת בהגדרות של הבטא, כדי לדעת אם התקיעה ממשיכה לקרות מאחורי הקלעים. */
+const NET_WAIT=window.__NET_WAIT||[10000,15000];
+const RETRY_KEY='fin-retry-'+ENV;
+function retryStats(){try{const o=JSON.parse(localStorage.getItem(RETRY_KEY)||'{}');return{n:+o.n||0,ok:+o.ok||0,t:+o.t||0};}catch(e){return{n:0,ok:0,t:0};}}
+function retryBump(ok){try{const o=retryStats();if(ok)o.ok++;else{o.n++;o.t=Date.now();}localStorage.setItem(RETRY_KEY,JSON.stringify(o));}catch(e){}}
+function timed(p,ms){
+  p.catch(()=>{});   // תשובה מאוחרת של ניסיון שכבר ויתרנו עליו לא צריכה להפוך לשגיאה
+  return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(Object.assign(new Error('timeout'),{code:'timeout'})),ms))]);
+}
+async function withRetry(fn,busyMsg){
+  try{return await timed(fn(),NET_WAIT[0]);}
+  catch(e){
+    if(!e||e.code!=='timeout'||navigator.onLine===false)throw e;
+    console.warn('no answer, reconnecting and trying again');
+    retryBump(false);
+    if(busyMsg)toast(busyMsg,'busy');
+    await D.reconnect();
+    const r=await timed(fn(),NET_WAIT[1]);
+    retryBump(true);
+    return r;
+  }
+}
 function errTag(e){return ENV==='beta'&&e?' ('+String(e.code||e.name||e.message||e).slice(0,60)+')':'';}
 function askConfirm(msg,opt){
   opt=opt||{};
@@ -1739,6 +1764,7 @@ function viewSettings(){
       (ENV==='beta'?setRow('beta','🧪','#D9822B','סביבת בדיקה','העתקת הנתונים האמיתיים וניקוי'):'')+
       setRow('','🗑️','#C83E52','מחיקת כל הנתונים','','reset')+'</div>'+
     '<p class="foot">'+(S.nw.assets.length+S.nw.liabilities.length)+' נכסים והתחייבויות, '+S.nw.history.length+' נקודות בגרף<br>גרסה '+VERSION_LABEL+(ENV==='beta'?' · סביבת בדיקה':'')+
+    (ENV==='beta'?(()=>{const r=retryStats();return '<br>ניסיונות חוזרים אחרי המתנה בלי תשובה: '+r.n+(r.n?' (הצליחו '+r.ok+', האחרון '+esc(relDay(r.t))+')':'');})():'')+
     (ENV==='beta'?'<br>ספרייה '+esc(D.ver||'')+(D.ver&&D.ver!==FB_VER?' (הגרסה החדשה '+FB_VER+' לא נטענה)':''):'')+
     (ENV==='beta'&&TIMES.data!==undefined?'<br>זמני פתיחה (מילישניות מתחילת הטעינה): ספרייה '+TIMES.lib+' · מסך '+TIMES.view+' · התחברות '+TIMES.auth+' · נתונים '+TIMES.data:'')+'</p>';
 }
@@ -2153,7 +2179,7 @@ function openCatSheet(id){
   openSheet(html);
   syncCatForm();
   if(c){
-    D.countCat(c.id).then(n=>{if(S.form!==f)return;f.used=n;f.usedKnown=true;syncCatForm();})
+    withRetry(()=>D.countCat(c.id)).then(n=>{if(S.form!==f)return;f.used=n;f.usedKnown=true;syncCatForm();})
       .catch(()=>{if(S.form!==f)return;f.countFailed=true;syncCatForm();});
   }else focusEl($('#c-name'));
 }
@@ -2174,7 +2200,7 @@ async function openStatsSheet(){
   const f=S.form={kind:'stats'};
   openSheet(sheetHead('סטטיסטיקות')+'<div id="st-body"><div class="skel" style="height:150px"></div></div>');
   try{
-    const r=await D.stats(S.tx.categories);
+    const r=await withRetry(()=>D.stats(S.tx.categories));
     if(S.form!==f)return;
     const row=c=>'<div class="tx-row" style="cursor:default"><span class="ic sm" style="--c:'+c.color+'">'+esc(c.icon)+'</span><span class="tx-main"><span class="tx-title">'+esc(c.name)+'</span></span><b class="num">'+F.n0.format(r.byCat[c.id]||0)+'</b></div>';
     const grp=(title,type)=>{
@@ -2201,7 +2227,7 @@ async function doExport(){
   toast('מכין גיבוי…','busy');
   let all;
   try{
-    all=await Promise.race([D.allTx(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000))]);
+    all=await withRetry(()=>D.allTx(),'החיבור איטי, מנסה שוב…');
   }catch(e){console.error(e);toast('אין חיבור לאינטרנט. נסו שוב'+errTag(e),'err');return;}
   const data={app:'personal-finance-dashboard',version:2,exportedAt:new Date().toISOString(),tx:{categories:S.tx.categories,transactions:all},nw:S.nw,rec:S.rec};
   const name='finance-backup-'+todayStr()+'.json';
@@ -2329,7 +2355,7 @@ async function importFile(file){
   toast('בודק מה כבר קיים…','busy');
   let curTx;
   try{
-    curTx=await Promise.race([D.allTx(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),20000))]);
+    curTx=await withRetry(()=>D.allTx(),'החיבור איטי, מנסה שוב…');
   }catch(e){console.error(e);toast('הייבוא דורש חיבור לאינטרנט'+errTag(e),'err');return;}
   const cur={cats:S.tx.categories,tx:curTx,assets:S.nw.assets,liabs:S.nw.liabilities,hist:S.nw.history,rec:S.rec};
   const plan=planImport(bTx,bNw,cur,normRec(obj.rec));
@@ -2513,7 +2539,7 @@ document.addEventListener('click',async e=>{
       if(!await askConfirm('למחוק לצמיתות את כל התנועות, הקטגוריות, הנכסים וההיסטוריה? כדאי לייצא גיבוי קודם.',{ok:'מחיקת הכל',danger:true}))break;
       toast('מוחק…','busy');
       let txIds;
-      try{txIds=await D.txIds();}catch(err){console.error(err);toast('המחיקה דורשת חיבור לאינטרנט'+errTag(err),'err');break;}
+      try{txIds=await withRetry(()=>D.txIds(),'החיבור איטי, מנסה שוב…');}catch(err){console.error(err);toast('המחיקה דורשת חיבור לאינטרנט'+errTag(err),'err');break;}
       const old={cats:S.tx.categories.map(c=>c.id),txs:txIds,assets:S.nw.assets.map(x=>x.id),
         liabs:S.nw.liabilities.map(x=>x.id),hist:S.nw.history.map(p=>String(p.t)),recs:S.rec.map(r=>r.id)};
       const cats=defaultCats();
