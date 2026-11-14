@@ -64,6 +64,11 @@ module.exports=async t=>{
   await note('סו');
   const chips=$$('#f-desc-sugg .chip');
   t.ok(!$('#f-desc-sugg').hidden&&chips.length===1&&/סופר שופרסל/.test(chips[0].textContent),'typing shows matching earlier descriptions');
+  // b3: typing again with the same result does not replace the chip under the finger, and pressing it keeps the keyboard
+  await note('סו');
+  t.ok($$('#f-desc-sugg .chip')[0]===chips[0],'the same suggestions are not re-rendered (the chip being tapped stays)');
+  const md=new A.w.MouseEvent('mousedown',{bubbles:true,cancelable:true});chips[0].dispatchEvent(md);
+  t.ok(md.defaultPrevented,'pressing a suggested description does not take focus from the field');
   click(chips[0]);await sleep(5);
   t.ok($('#f-note').value==='סופר שופרסל'&&catOn()==='food'&&acctOn()==='c1'&&$('#f-desc-sugg').hidden,'tapping fills the description, category and account');
   t.ok($('#f-amount').value==='','…not the amount');
