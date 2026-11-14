@@ -43,10 +43,13 @@ async function main(){
     }
     await p.click('.tab[data-v="home"]');await p.click('[data-a="fab"]');await p.waitForTimeout(450);await shot('add');
     await p.fill('#f-note','ש');await p.type('#f-note','ו');await p.waitForTimeout(300);await shot('add-sugg');   // הצעת קטגוריה + השלמת תיאורים (1.0.7 · b2)
+    await p.click('[data-a="sheet-close"]');await p.click('[data-a="fab"]');await p.waitForTimeout(300);
+    await p.click('#f-favs .chip');await p.waitForTimeout(400);await shot('add-fav');   // מועדף נבחר (1.0.8)
+    await p.click('#f-fav-tg');await p.evaluate(()=>{const s=document.querySelector('#sheet');s.scrollTop=s.scrollHeight;});await p.waitForTimeout(300);await shot('add-fav-tg');
     await p.click('[data-a="sheet-close"]');await p.click('.tab[data-v="nw"]');await p.click('[data-a="nw-bulk"]');await p.waitForTimeout(450);await shot('bulk');
     await p.click('[data-a="sheet-close"]');await p.click('[data-a="asset-edit"]');await p.waitForTimeout(450);await shot('account');
     await p.click('[data-a="sheet-close"]');await p.click('.tab[data-v="settings"]');
-    for(const v of ['rec','cats']){await p.click('[data-a="set"][data-v="'+v+'"]');await p.waitForTimeout(300);await shot('settings-'+v,true);await p.click('[data-a="set-back"]');}
+    for(const v of ['rec','favs','cats']){await p.click('[data-a="set"][data-v="'+v+'"]');await p.waitForTimeout(300);await shot('settings-'+v,true);if(v==='favs'){await p.click('[data-a="fav-edit"]');await p.waitForTimeout(450);await shot('fav-edit');await p.click('[data-a="sheet-close"]');await p.waitForTimeout(300);}await p.click('[data-a="set-back"]');}
     await p.click('[data-a="set"][data-v="theme"]');await p.waitForTimeout(450);await shot('settings-theme');
     await p.close();
   }

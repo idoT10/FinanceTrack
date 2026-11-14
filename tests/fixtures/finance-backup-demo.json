@@ -5958,5 +5958,73 @@
       "total": 3600,
       "paid": 600
     }
+  ],
+  "fav": [
+    {
+      "id": "demo-fav-coffee",
+      "type": "expense",
+      "note": "קפה",
+      "categoryId": "demo-cat-eat",
+      "catName": "אוכל בחוץ",
+      "amount": 14,
+      "ord": 1,
+      "createdAt": 1793638860000,
+      "accountId": "demo-l-visa"
+    },
+    {
+      "id": "demo-fav-super",
+      "type": "expense",
+      "note": "סופר",
+      "categoryId": "demo-cat-super",
+      "catName": "סופר",
+      "amount": 0,
+      "ord": 2,
+      "createdAt": 1793638920000,
+      "accountId": "demo-l-visa"
+    },
+    {
+      "id": "demo-fav-fuel",
+      "type": "expense",
+      "note": "דלק",
+      "categoryId": "demo-cat-car",
+      "catName": "תחבורה ודלק",
+      "amount": 250,
+      "ord": 3,
+      "createdAt": 1793638980000,
+      "accountId": "demo-l-visa"
+    },
+    {
+      "id": "demo-fav-dog",
+      "type": "expense",
+      "note": "אוכל לכלב",
+      "categoryId": "demo-cat-pet",
+      "catName": "חיות מחמד",
+      "amount": 89.9,
+      "ord": 4,
+      "createdAt": 1793639040000,
+      "accountId": "demo-l-visa"
+    },
+    {
+      "id": "demo-fav-cash",
+      "type": "expense",
+      "note": "פלאפל",
+      "categoryId": "demo-cat-eat",
+      "catName": "אוכל בחוץ",
+      "amount": 22,
+      "ord": 5,
+      "createdAt": 1793639100000,
+      "accountId": "demo-a-wallet"
+    },
+    {
+      "id": "demo-fav-extra",
+      "type": "income",
+      "note": "עבודה פרילנס",
+      "categoryId": "demo-cat-extra",
+      "catName": "הכנסה נוספת",
+      "amount": 0,
+      "ord": 6,
+      "createdAt": 1793639160000,
+      "accountId": "demo-a-checking"
+    }
   ]
 }

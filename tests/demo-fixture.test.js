@@ -15,5 +15,6 @@ module.exports=async t=>{
   A.tab('nw');await sleep(50);
   t.ok(A.$$('.tx-sub.stale').length>3,'stale items are marked');
   t.ok(keys(sh,P+'recurring/').length===B.rec.length&&[...sh.store.values()].some(v=>v.type==='transfer'&&v.note==='חיוב כרטיס אשראי'),'recurring templates and transfers imported');
+  t.ok(keys(sh,P+'favorites/').length===B.fav.length,'favorites imported (1.0.8)');
   t.ok(!A.errors.length,'no script errors');
 };
