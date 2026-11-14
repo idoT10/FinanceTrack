@@ -94,7 +94,7 @@ module.exports=async t=>{
   t.ok(JSON.parse(A.w.localStorage.getItem('fin-cat-use-beta')).b===1,'saving a transaction counts its category');
   // ---- settings menu ----
   click($('[data-a="sheet-close"]'));A.tab('settings');await sleep(20);
-  t.ok($$('#view [data-a="set"]').length===7&&!$('#view [data-a="cat-edit"]'),'settings is a menu of rows');
+  t.ok($$('#view [data-a="set"]').length===8&&!$('#view [data-a="cat-edit"]'),'settings is a menu of rows (8 with מועדפים, 1.0.8)');
   A.set('cats');await sleep(20);
   t.ok($('#view [data-a="cat-edit"]')&&$('[data-a="set-back"]'),'categories open as a page with a way back');
   click($('[data-a="set-back"]'));await sleep(20);

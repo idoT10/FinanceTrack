@@ -181,16 +181,23 @@ rec=[tmpl('rent','expense',4800,'home','שכירות',1,'2026-04','2026-11','che
      tmpl('paper','expense',29.90,'subs','עיתון',3,'2026-04','2026-07','checking',paused=True),
      tmpl('laptop','expense',900,'shop','מחשב נייד',9,'2026-06','2026-11','visa',count=6,total=5400,paid=5400),   # הסתיים
      tmpl('fridge','expense',300,'home','מקרר',20,'2026-09','2026-10','visa',count=12,total=3600,paid=600)]         # 2 מתוך 12
+# ---------- favorites (1.0.8): ord = the order in the add window; amount 0 = none ----------
+def fav(key,typ,note,cat,amount,ordn,acct=None):
+    f={'id':'demo-fav-'+key,'type':typ,'note':note,'categoryId':C(cat),'catName':cname[C(cat)],'amount':amount,'ord':ordn,'createdAt':ms(dt.date(2026,11,2),20,ordn)}
+    if acct: f['accountId']=ACC(acct)
+    return f
+favs=[fav('coffee','expense','קפה','eat',14,1,'visa'),fav('super','expense','סופר','super',0,2,'visa'),fav('fuel','expense','דלק','car',250,3,'visa'),
+      fav('dog','expense','אוכל לכלב','pet',89.90,4,'visa'),fav('cash','expense','פלאפל','eat',22,5,'wallet'),fav('extra','income','עבודה פרילנס','extra',0,6,'checking')]
 assert len({p['t'] for p in hist})==len(hist)
 data={'app':'personal-finance-dashboard','version':2,'exportedAt':dt.datetime(2026,11,14,9,30,tzinfo=TZ).isoformat(),
       'tx':{'categories':categories,'transactions':tx},
-      'nw':{'assets':list(AS.values()),'liabilities':list(LI.values()),'history':hist},'rec':rec}
+      'nw':{'assets':list(AS.values()),'liabilities':list(LI.values()),'history':hist},'rec':rec,'fav':favs}
 import os,sys
 out=os.path.join(os.path.dirname(os.path.abspath(__file__)),'finance-backup-demo.json')
 json.dump(data,open(out,'w',encoding='utf-8'),ensure_ascii=False,indent=2)
 from collections import Counter
 print('transactions:',len(tx),'| income:',sum(1 for t in tx if t['type']=='income'),'| months:',dict(sorted(Counter(t['date'][:7] for t in tx).items())))
-print('types:',dict(Counter(t['type'] for t in tx)),'| recurring:',len(rec),'| live:',{k:bal(k) for k in LIVE})
+print('types:',dict(Counter(t['type'] for t in tx)),'| recurring:',len(rec),'| favorites:',len(favs),'| live:',{k:bal(k) for k in LIVE})
 print('categories:',len(categories),'| assets:',len(AS),'| liabilities:',len(LI),'| history points:',len(hist))
 print('net worth now:',round(a-l),'| first point:',round(hist[0]['n']),'| notes:',dict(Counter(p['note'].split(':')[0] for p in hist)))
 stale=[x['name'] for x in list(AS.values())+list(LI.values()) if (ms(TODAY,23)-x['updatedAt'])/864e5>35]
