@@ -27,6 +27,8 @@ module.exports=async t=>{
   const mem=()=>{try{return JSON.parse(A.w.localStorage.getItem('fin-sugg-beta'));}catch(e){return null;}};
 
   await open();
+  // b6: the iPhone's pending autocorrection swallowed the tap on a suggestion (it applied "טוב" instead of "אוכ")
+  t.ok($('#f-note').getAttribute('autocorrect')==='off'&&$('#f-note').getAttribute('spellcheck')==='false','b6: no autocorrect on the description field');
   t.ok(await waitFor(()=>mem()&&mem().learned),'first open of the add sheet learns from all transactions');
   t.ok(reads===1,'…with one read');
 
