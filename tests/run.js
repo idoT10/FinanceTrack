@@ -1,11 +1,13 @@
 // npm test  → runs every tests/*.test.js against beta/index.html
 // TARGET=index.html npm test → runs them against the production file
 const fs=require('fs'),path=require('path');
+const clock=require('./lib/clock');   // before any test file computes "today"
 const files=fs.readdirSync(__dirname).filter(f=>f.endsWith('.test.js')).sort();
 const only=process.argv[2];
 (async()=>{
   let pass=0,fail=0;
-  console.log('target: '+(process.env.TARGET||'beta/index.html')+'\n');
+  console.log('target: '+(process.env.TARGET||'beta/index.html'));
+  console.log('clock:  '+clock.startedAt().toString().slice(0,24)+(process.env.TEST_NOW?' (TEST_NOW)':'')+'\n');
   for(const f of files){
     if(only&&!f.includes(only))continue;
     console.log('■ '+f);

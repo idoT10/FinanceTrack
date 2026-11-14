@@ -1,5 +1,7 @@
 // Loads the REAL app (beta/index.html by default) into jsdom, with Firebase swapped for the in-memory fake in ./fakefs.js.
 // Only D.init() is replaced; everything else (data layer, screens, events) is the production code.
+// The clock (Node and the window) starts at 12:00 of today, so a run never crosses midnight: see ./clock.js.
+const clock=require('./clock');
 const {JSDOM,VirtualConsole}=require('jsdom');
 const fs=require('fs'),path=require('path');
 const {makeShared,makeFake}=require('./fakefs');
@@ -26,7 +28,7 @@ function openApp(shared,{path:p='/FinanceTrack/beta/',user=USER,beforeParse}={})
   vc.on('jsdomError',e=>errors.push(e.message));
   const fake=makeFake(shared,user);
   const dom=new JSDOM(HTML,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://idot10.github.io'+p,virtualConsole:vc,
-    beforeParse(w){w.scrollTo=()=>{};w.__FAKE=fake;w.__inClick=false;if(beforeParse)beforeParse(w);}});
+    beforeParse(w){clock.installIn(w);w.scrollTo=()=>{};w.__FAKE=fake;w.__inClick=false;if(beforeParse)beforeParse(w);}});
   const w=dom.window,d=w.document;
   const app={w,d,fake,errors,
     $:s=>d.querySelector(s),$$:s=>[...d.querySelectorAll(s)],
