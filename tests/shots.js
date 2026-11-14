@@ -42,6 +42,7 @@ async function main(){
       await shot(v+'-full',true);
     }
     await p.click('.tab[data-v="home"]');await p.click('[data-a="fab"]');await p.waitForTimeout(450);await shot('add');
+    await p.fill('#f-note','ש');await p.type('#f-note','ו');await p.waitForTimeout(300);await shot('add-sugg');   // הצעת קטגוריה + השלמת תיאורים (1.0.7 · b2)
     await p.click('[data-a="sheet-close"]');await p.click('.tab[data-v="nw"]');await p.click('[data-a="nw-bulk"]');await p.waitForTimeout(450);await shot('bulk');
     await p.click('[data-a="sheet-close"]');await p.click('[data-a="asset-edit"]');await p.waitForTimeout(450);await shot('account');
     await p.click('[data-a="sheet-close"]');await p.click('.tab[data-v="settings"]');

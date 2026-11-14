@@ -21,7 +21,7 @@ module.exports=async t=>{
   t.ok(order==='f-amount,f-note,f-cats'&&/תיאור/.test($('#sheet').textContent)&&!/הערה/.test($('#sheet').textContent),'"תיאור" right under the amount, before the categories');
   // all categories in a scrolling block of up to 3 rows
   const cats=()=>$$('#f-cats .chip[data-a="f-cat"]').length;
-  t.ok(cats()===12&&$('#f-cats').classList.contains('block')&&$('#f-cats').style.getPropertyValue('--rows')==='3'&&!$('[data-a="f-cat-more"]'),'12 categories: all shown, block of 3 rows, no "עוד"');
+  t.ok(cats()===12&&$('#f-cats').classList.contains('block')&&$('#f-cats').style.getPropertyValue('--rows')==='2'&&!$('[data-a="f-cat-more"]'),'12 categories: all shown, block of 2 rows (1.0.7 · b2), no "עוד"');
   t.ok($('#f-accts').classList.contains('line'),'accounts in one scrolling line');
 
   // expense from the card, income to עו"ש
