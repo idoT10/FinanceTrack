@@ -171,6 +171,12 @@ h2.h{font-size:15px;font-weight:650;color:var(--ink-2)}
 /* קטגוריות: גוש של כמה שורות שנגלל לצדדים */
 .chips.block{display:grid;grid-auto-flow:column;grid-template-rows:repeat(var(--rows,1),auto);justify-content:start;overflow-x:auto;scrollbar-width:none;margin:0 -18px;padding:2px 18px}
 .chips.block::-webkit-scrollbar{display:none}
+/* חלון ההוספה: כפתורי קטגוריה קטנים יותר, בגוש של עד 2 שורות */
+#f-cats .chip{padding:6px 11px;font-size:13.5px;gap:5px}
+#f-cats{gap:6px}
+.chips.line.desc-sugg{margin-top:8px}
+.desc-sugg .chip{padding:6px 11px;font-size:13.5px}
+.sugg-tag{font-weight:500;color:var(--accent);font-size:12.5px}
 .tx-row.dim{opacity:.55}
 .inst-row{display:flex;align-items:center;gap:10px;margin-top:10px}
 .inst-row .input{width:90px;text-align:center}
@@ -565,7 +571,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.7',APP_BUILD='b1',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.7',APP_BUILD='b2',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
@@ -1318,6 +1324,128 @@ function usageCounts(){
   return m;
 }
 
+/* ---------- הצעת קטגוריה וחשבון לפי התיאור (1.0.7) ----------
+   זיכרון בטלפון בלבד (לפי סביבה ומשתמש): לכל תיאור, לפי סוג (הוצאה/הכנסה), הקטגוריה והחשבון שנבחרו בפעם האחרונה.
+   בפעם הראשונה לומדים מכל התנועות (קריאה אחת מהשרת, פעם אחת לכל מכשיר). אחר כך כל שמירה מעדכנת. */
+const SUGG_KEY='fin-sugg-'+ENV,SUGG_MAX=800;
+let SUGG=null,suggLearning=false;
+const normDesc=s=>String(s||'').toLowerCase().replace(/[֑-ׇ]/g,'').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+const descWords=s=>s.split(' ').filter(w=>w.length>=2);
+function suggMem(){
+  const id=S.user&&S.user.uid;if(!id)return null;
+  if(SUGG&&SUGG.uid===id)return SUGG;
+  let o=null;try{o=JSON.parse(localStorage.getItem(SUGG_KEY)||'null');}catch(e){}
+  if(!o||o.v!==1||o.uid!==id||typeof o.m!=='object'||!o.m)o={v:1,uid:id,learned:false,m:{expense:{},income:{}}};
+  o.m.expense=o.m.expense||{};o.m.income=o.m.income||{};
+  return SUGG=o;
+}
+function suggSave(){
+  const o=SUGG;if(!o)return;
+  for(const k of ['expense','income']){
+    const m=o.m[k],ks=Object.keys(m);
+    if(ks.length>SUGG_MAX)ks.sort((a,b)=>m[a].t-m[b].t).slice(0,ks.length-SUGG_MAX).forEach(x=>{delete m[x];});
+  }
+  try{localStorage.setItem(SUGG_KEY,JSON.stringify(o));}catch(e){console.warn(e);}
+}
+/* תנועה אחת לזיכרון. when = מתי נבחר (החדש מנצח, כך שתיקון נזכר) */
+function suggLearn(t,when,o){
+  o=o||suggMem();if(!o||!t||(t.type!=='expense'&&t.type!=='income')||!t.categoryId)return;
+  const k=normDesc(t.note);if(!k)return;
+  const m=o.m[t.type],e=m[k];
+  if(e&&e.t>when){e.n++;return;}
+  m[k]={d:String(t.note).trim(),c:t.categoryId,a:t.accountId||'',t:when,n:(e?e.n:0)+1};
+}
+function suggForget(){SUGG=null;try{localStorage.removeItem(SUGG_KEY);}catch(e){}}
+function suggLearnSaved(t){const o=suggMem();if(!o)return;suggLearn(t,Date.now(),o);suggSave();}
+/* פעם אחת לכל מכשיר: לומדים מכל התנועות (שקטה, ואם נכשלת מנסים בפעם הבאה שהחלון נפתח) */
+async function suggLearnAll(){
+  const o=suggMem();
+  if(!o||o.learned||suggLearning||!S.live||navigator.onLine===false)return;
+  suggLearning=true;
+  try{
+    const all=await D.allTx();
+    if(SUGG!==o)return;
+    const tw=t=>t.createdAt||Date.parse(t.date)||0;
+    all.filter(t=>t.note).sort((a,b)=>tw(a)-tw(b)).forEach(t=>suggLearn(t,tw(t),o));
+    o.learned=true;suggSave();
+    if(S.form&&S.form.kind==='tx'&&!S.form.id)syncSugg();
+  }catch(e){console.warn('suggestions: learning skipped',e);}
+  finally{suggLearning=false;}
+}
+const catOk=(id,type)=>S.tx.categories.some(c=>c.id===id&&c.type===type);
+/* ההתאמה הטובה ביותר: תיאור זהה; אחרת מה שהוקלד הוא תחילת תיאור מוכר (מ-2 אותיות); אחרת מילה משותפת */
+function suggFind(type,text){
+  const o=suggMem(),q=normDesc(text);if(!o||!q)return null;
+  const m=o.m[type]||{},ok=e=>catOk(e.c,type);
+  if(m[q]&&ok(m[q]))return{e:m[q],exact:true};
+  const better=(a,b)=>!b||a.n>b.n||(a.n===b.n&&a.t>b.t);
+  let best=null;
+  if(q.length>=2)for(const k in m)if(k.startsWith(q)&&ok(m[k])&&better(m[k],best))best=m[k];
+  if(best)return{e:best,exact:false};
+  const qw=new Set(descWords(q));if(!qw.size)return null;
+  let bs=0;
+  for(const k in m){
+    if(!ok(m[k]))continue;
+    const s=descWords(k).filter(w=>qw.has(w)).length;
+    if(s&&(s>bs||(s===bs&&better(m[k],best)))){bs=s;best=m[k];}
+  }
+  return best?{e:best,exact:false}:null;
+}
+/* השלמת תיאורים: עד שלושה תיאורים קודמים שמתאימים למה שהוקלד (קודם כאלה שמתחילים בו) */
+function suggList(type,text){
+  const o=suggMem(),q=normDesc(text);if(!o||q.length<2)return[];
+  const m=o.m[type]||{},pre=[],mid=[];
+  for(const k in m){
+    if(k===q||!catOk(m[k].c,type))continue;
+    if(k.startsWith(q))pre.push(m[k]);else if((' '+k).includes(' '+q))mid.push(m[k]);
+  }
+  const ord=(a,b)=>b.n-a.n||b.t-a.t;
+  return pre.sort(ord).concat(mid.sort(ord)).slice(0,3);
+}
+/* מחילים הצעה על החלון. בחירה ידנית (catManual/acctManual) גוברת ומפסיקה את ההצעות באותו חלון */
+function applySugg(e,exact){
+  const f=S.form;if(!f)return;
+  if(!f.catManual){
+    const c=e?e.c:null;
+    if(c&&c!==f.categoryId){f.categoryId=c;f.catSugg=true;renderCatChips();}
+    else if(!c&&f.catSugg){f.categoryId=null;f.catSugg=false;renderCatChips();}
+    else if(c)f.catSugg=true;
+  }
+  if(!f.acctManual){
+    // רק תיאור זהה מציע חשבון, והוא גובר על "האחרון שנבחר"
+    const a=e&&exact&&e.a&&isLive(acctOf(e.a))?e.a:null;
+    if(a&&a!==f.accountId){f.accountId=a;f.acctSugg=true;renderAcctChips();}
+    else if(!a&&f.acctSugg){f.accountId=lastAcct(f.type);f.acctSugg=false;renderAcctChips();}
+    else if(a)f.acctSugg=true;
+  }
+  syncSuggHints();
+}
+function syncSuggHints(){
+  const f=S.form,h=$('#f-cat-sugg'),ah=$('#f-acct-sugg');if(!f)return;
+  if(h){const on=!!(f.catSugg&&f.categoryId);h.hidden=!on;h.textContent=on?'הוצעה לפי '+(f.type==='income'?'הכנסות':'הוצאות')+' קודמות':'';}
+  if(ah){ah.hidden=!(f.acctSugg&&f.accountId);}
+}
+/* בכל הקלדה בתיאור: הצעה + השלמה. רק בתנועה חדשה מסוג הוצאה/הכנסה */
+function syncSugg(){
+  const f=S.form,box=$('#f-desc-sugg'),inp=$('#f-note');
+  if(!f||f.kind!=='tx'||f.id||!inp)return;
+  const on=f.type==='expense'||f.type==='income';
+  const r=on?suggFind(f.type,inp.value):null;
+  applySugg(r&&r.e,r&&r.exact);
+  if(!box)return;
+  const list=on?suggList(f.type,inp.value):[];
+  f.descList=list;
+  box.hidden=!list.length;
+  box.innerHTML=list.map((e,i)=>{const c=catView(e.c);return '<button class="chip" style="--c:'+c.color+'" data-a="f-desc" data-v="'+i+'">'+esc(c.icon)+' '+esc(e.d)+'</button>';}).join('');
+}
+/* לחיצה על תיאור מוצע: ממלאת את התיאור והקטגוריה (לא סכום). החשבון לפי אותו כלל של תיאור זהה */
+function pickDesc(i){
+  const f=S.form,e=f&&f.descList&&f.descList[+i];if(!e)return;
+  $('#f-note').value=e.d;
+  f.catManual=false;
+  syncSugg();
+}
+
 /* ================= UI bits ================= */
 let toastTimer,undoFn=null;
 const UNDO_MS=5000;
@@ -1917,9 +2045,10 @@ function openTxSheet(id){
     '<div class="seg" id="f-type"><button data-a="f-type" data-v="expense">הוצאה</button><button data-a="f-type" data-v="income">הכנסה</button><button data-a="f-type" data-v="transfer">העברה</button></div>'+
     '<label class="amount-wrap" id="f-amount-wrap"><span class="cur">₪</span><input id="f-amount" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0" aria-label="סכום" value="'+(t?t.amount:'')+'"></label>'+
     '<div class="field-label">תיאור</div><input id="f-note" class="input" placeholder="למשל: קפה עם דני" enterkeyhint="done" autocomplete="off" value="'+esc(t?t.note:'')+'">'+
-    '<div id="f-cat-sec"><div class="field-label">קטגוריה</div><div class="chips block" id="f-cats"></div>'+
+    (t?'':'<div class="chips line desc-sugg" id="f-desc-sugg" hidden></div>')+
+    '<div id="f-cat-sec"><div class="field-label">קטגוריה <span class="sugg-tag" id="f-cat-sugg" hidden></span></div><div class="chips block" id="f-cats"></div>'+
     '<div class="newcat" id="f-newcat" hidden><input id="f-newcat-icon" class="input emoji-in" maxlength="8" value="🏷️" aria-label="אייקון"><input id="f-newcat-name" class="input grow" placeholder="שם הקטגוריה" enterkeyhint="done"><button class="btn primary" style="padding:12px 16px" data-a="f-newcat-save">הוספה</button></div><p class="hint" id="f-budget-hint" hidden></p></div>'+
-    '<div id="f-acct-sec"><div class="field-label" id="f-acct-label">מאיזה חשבון</div><div class="chips line" id="f-accts"></div></div>'+
+    '<div id="f-acct-sec"><div class="field-label"><span id="f-acct-label">מאיזה חשבון</span> <span class="sugg-tag" id="f-acct-sugg" hidden>הוצע לפי התיאור</span></div><div class="chips line" id="f-accts"></div></div>'+
     '<div id="f-xfer-sec"><div class="field-label">מחשבון</div><div class="chips line" id="f-from"></div><div class="field-label">לחשבון</div><div class="chips line" id="f-to"></div><div id="f-debt" style="margin-top:10px" hidden><button class="chip" data-a="f-debt"></button></div></div>'+
     '<div class="field-label">תאריך</div><div class="date-row"><div class="chips" id="f-datechips"><button class="chip" data-a="f-date" data-v="t">היום</button><button class="chip" data-a="f-date" data-v="y">אתמול</button></div><input type="date" id="f-date" class="input" value="'+f.date+'"></div>'+
     (t&&t.recId?'<p class="hint">'+(t.inst?'שינוי הסכום כאן משנה את מה שנשאר: היתרה תתחלק מחדש על התשלומים הבאים.':'שינוי כאן חל רק על התנועה הזאת. לשינוי החודשים הבאים: הגדרות ← תנועות חוזרות ותשלומים.')+'</p>':'')+
@@ -1932,7 +2061,7 @@ function openTxSheet(id){
   openSheet(html);
   syncTxType();syncDateChips();
   const amt=$('#f-amount');sizeAmount(amt);
-  if(!t)focusEl(amt);
+  if(!t){focusEl(amt);suggLearnAll();}
 }
 /* רשומת התאמת יתרה: רק צפייה ומחיקה (מחיקה מחזירה את היתרה לקודמת) */
 function openAdjustSheet(t){
@@ -2007,9 +2136,9 @@ function renderCatChips(){
   const counts=usageCounts();
   const all=S.tx.categories.map((c,i)=>({c,i})).filter(o=>o.c.type===f.type)
     .sort((a,b)=>(counts[b.c.id]||0)-(counts[a.c.id]||0)||a.i-b.i).map(o=>o.c);
-  // כל הקטגוריות, הנפוצות ראשונות, בגוש של עד 3 שורות שנגלל לצדדים
+  // כל הקטגוריות, הנפוצות ראשונות, בגוש של עד 2 שורות שנגלל לצדדים
   const cats=all,n=cats.length+1;
-  box.style.setProperty('--rows',n>8?3:n>3?2:1);
+  box.style.setProperty('--rows',n>3?2:1);
   box.innerHTML=(all.length?'':'<span class="muted small" style="align-self:center">עוד אין קטגוריות מסוג זה.</span>')+
     cats.map(c=>'<button class="chip '+(f.categoryId===c.id?'on':'')+'" style="--c:'+c.color+'" data-a="f-cat" data-id="'+esc(c.id)+'">'+esc(c.icon)+' '+esc(c.name)+'</button>').join('')+
     '<button class="chip add" data-a="f-newcat">＋ חדשה</button>';
@@ -2024,7 +2153,7 @@ function addInlineCat(){
   const name=$('#f-newcat-name').value.trim();
   if(!name){toast('צריך שם לקטגוריה');focusEl($('#f-newcat-name'));return;}
   const c={id:uid(),name,icon:firstGlyph($('#f-newcat-icon').value)||'🏷️',type:f.type,color:PALETTE[S.tx.categories.length%PALETTE.length],ord:Date.now()};
-  S.tx.categories.push(c);f.categoryId=c.id;
+  S.tx.categories.push(c);f.categoryId=c.id;f.catManual=true;f.catSugg=false;syncSuggHints();
   D.putCat(c);
   $('#f-newcat').hidden=true;$('#f-newcat-name').value='';
   renderCatChips();toast('הקטגוריה נוספה');
@@ -2058,6 +2187,7 @@ function saveTx(){
     if(active)S.tx.transactions.push(t);
   }
   if(!xfer)setLastAcct(f.type,f.accountId);
+  if(!xfer)suggLearnSaved(fields);
   if(!xfer&&!f.id)bumpCatUse(f.categoryId);
   if(!f.id&&f.repeat!=='once'){saveRecurringNew(f,fields,date);return;}
   const edited=!!f.id,tid=t.id;
@@ -2474,6 +2604,7 @@ async function runImport(plan){
     const a=plan.add;
     await D.importAll({categories:a.categories,transactions:a.transactions},{assets:a.assets,liabilities:a.liabilities,history:a.history},a.recurring,a.catBudgets);
     toast('נוספו '+F.n0.format(plan.total)+' פריטים מהגיבוי');
+    const o=suggMem();if(o){(a.transactions||[]).forEach(t=>suggLearn(t,t.createdAt||Date.parse(t.date)||0,o));suggSave();}
   }catch(e){console.error(e);toast('הייבוא לא הושלם. אפשר לייבא שוב, מה שכבר נוסף ידולג'+errTag(e),'err');}
 }
 async function importFile(file){
@@ -2536,14 +2667,15 @@ document.addEventListener('click',async e=>{
     case 'range':S.range=v;render();break;
     case 'sheet-close':closeSheet();break;
 
-    case 'f-type':if(f&&f.type!==v){f.type=v;f.categoryId=null;if(!f.id&&v!=='transfer')f.accountId=lastAcct(v);syncTxType();}break;
-    case 'f-acct':if(f){f.accountId=id||null;renderAcctChips();}break;
+    case 'f-type':if(f&&f.type!==v){f.type=v;f.categoryId=null;f.catManual=f.catSugg=f.acctManual=f.acctSugg=false;if(!f.id&&v!=='transfer')f.accountId=lastAcct(v);syncTxType();syncSugg();syncSuggHints();}break;
+    case 'f-acct':if(f){f.accountId=id||null;f.acctManual=true;f.acctSugg=false;renderAcctChips();syncSuggHints();}break;
+    case 'f-desc':pickDesc(v);break;
     case 'f-rep':if(f){f.repeat=v;syncRep();if(v==='inst')focusEl($('#f-inst'),true);}break;
     case 'f-from':if(f){f.fromId=id;if(f.toId===id)f.toId=null;renderXferChips();}break;
     case 'f-to':if(f){f.toId=id;renderXferChips();}break;
     case 'f-debt':{const to=f&&acctOf(f.toId),i=$('#f-amount');if(to&&i){i.value=String(to.x.value);sizeAmount(i);syncRep();}break;}
     case 'go-cats':S.view='settings';S.setPage='cats';S.catTab='expense';try{history.pushState({set:'cats'},'');}catch(err){}render();window.scrollTo(0,0);break;
-    case 'f-cat':if(f){f.categoryId=id;renderCatChips();}break;
+    case 'f-cat':if(f){f.categoryId=id;f.catManual=true;f.catSugg=false;renderCatChips();syncSuggHints();}break;
     case 'f-newcat':{const box=$('#f-newcat');box.hidden=!box.hidden;if(!box.hidden)focusEl($('#f-newcat-name'));break;}
     case 'f-newcat-save':addInlineCat();break;
     case 'f-date':if(f){f.date=v==='t'?todayStr():yesterdayStr();$('#f-date').value=f.date;syncDateChips();}break;
@@ -2656,7 +2788,7 @@ document.addEventListener('click',async e=>{
       closeSheet();
       if(!await askConfirm('למחוק את כל נתוני הבדיקה? הנתונים האמיתיים לא ישתנו.',{ok:'ניקוי',danger:true}))break;
       toast('מנקה…','busy');
-      try{const n=await D.betaWipe();toast('נוקו '+n+' מסמכים מסביבת הבדיקה');}
+      try{const n=await D.betaWipe();suggForget();toast('נוקו '+n+' מסמכים מסביבת הבדיקה');}
       catch(err){console.error(err);toast('הניקוי נכשל. בדקו את החיבור ונסו שוב'+errTag(err),'err');}
       break;
     }
@@ -2676,7 +2808,7 @@ document.addEventListener('click',async e=>{
       const cats=defaultCats();
       S.tx={categories:cats,transactions:[]};S.nw={assets:[],liabilities:[],history:[]};S.rec=[];
       S.txCat=null;
-      D.wipe(old,cats);render();toast('כל הנתונים נמחקו');break;
+      suggForget();D.wipe(old,cats);render();toast('כל הנתונים נמחקו');break;
     }
   }
 });
@@ -2687,6 +2819,7 @@ document.addEventListener('input',e=>{
   if(el.id==='f-amount'||el.id==='f-inst')syncRep();
   if(el.classList&&el.classList.contains('bulk-in'))bulkTotal();
   if(el.id==='tx-search'){S.txQ=el.value;updateTxResults();}
+  if(el.id==='f-note')syncSugg();
 });
 document.addEventListener('focusin',e=>{
   const el=e.target;
