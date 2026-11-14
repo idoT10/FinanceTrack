@@ -8,7 +8,9 @@ module.exports=async t=>{
   t.ok(keys(sh,P+'tx/').length===B.tx.transactions.length,'all '+B.tx.transactions.length+' transactions imported');
   t.ok(keys(sh,P+'history/').length===B.nw.history.length&&keys(sh,P+'assets/').length===B.nw.assets.length,'assets and history imported');
   t.ok(maxBatch(sh)<=10,'batches ≤10');
-  A.tab('tx');for(let i=0;i<3;i++)A.click(A.$$('[data-a="month"]')[0]);await sleep(150);
+  // 3 months before the backup was made (August 2026), not 3 months before today: the demo data ends in November 2026
+  const ex=new Date(B.exportedAt),now=new Date(),back=(now.getFullYear()-ex.getFullYear())*12+now.getMonth()-ex.getMonth()+3;
+  A.tab('tx');for(let i=0;i<back;i++)A.click(A.$$('[data-a="month"]')[0]);await sleep(150);
   t.ok(A.$$('.tx-row').length>20,'an older month loads on demand ('+A.$('.mname').textContent.trim()+': '+A.$$('.tx-row').length+' rows)');
   A.tab('nw');await sleep(50);
   t.ok(A.$$('.tx-sub.stale').length>3,'stale items are marked');
