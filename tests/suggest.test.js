@@ -72,6 +72,10 @@ module.exports=async t=>{
   click(chips[0]);await sleep(5);
   t.ok($('#f-note').value==='סופר שופרסל'&&catOn()==='food'&&acctOn()==='c1'&&$('#f-desc-sugg').hidden,'tapping fills the description, category and account');
   t.ok($('#f-amount').value==='','…not the amount');
+  t.ok(A.d.activeElement!==$('#f-note')&&$('#f-note').classList.contains('flash')&&$('#f-cats .chip.on').classList.contains('flash'),'b4: after the tap the keyboard closes, and the field and category flash');
+  // b4: the iPhone keyboard finishing its word writes the typed text back ("סו") right after the tap
+  await note('סו');click($$('#f-desc-sugg .chip')[0]);A.type($('#f-note'),'סו');await sleep(200);
+  t.ok($('#f-note').value==='סופר שופרסל'&&$('#f-desc-sugg').hidden,'b4: the picked description survives the keyboard writing back the typed letters');
   await close();
 
   // saving teaches

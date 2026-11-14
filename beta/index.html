@@ -306,6 +306,9 @@ textarea.input{min-height:130px;direction:ltr;text-align:left;resize:vertical;fo
 body.lock .toast{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 14px)}
 .skel{border-radius:18px;background:var(--sunk);margin-bottom:12px;animation:pulse 1.1s ease-in-out infinite alternate}
 @keyframes pulse{from{opacity:.55}to{opacity:1}}
+/* תיאור מוצע נבחר: הבהוב קצר בשדה ובקטגוריה */
+@keyframes flash{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c,var(--accent)) 55%,transparent)}100%{box-shadow:0 0 0 10px transparent}}
+.flash{animation:flash .6s ease-out}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 /* gate (התחברות) */
@@ -571,7 +574,7 @@ function setTheme(t){
 
 /* ================= סביבה: ייצור או בדיקה ================= */
 // אותו קובץ רץ בשתי כתובות. ב-/beta/ כל הנתונים נכתבים תחת users/<uid>/beta/main/...
-const APP_VERSION='1.0.7',APP_BUILD='b3',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
+const APP_VERSION='1.0.7',APP_BUILD='b4',VERSION_LABEL=APP_VERSION+' · '+APP_BUILD;
 const ENV=/\/beta\//.test(location.pathname)?'beta':'prod';
 const DATA_COLS=['meta','categories','tx','assets','liabilities','history','recurring'];
 
@@ -1443,9 +1446,15 @@ function syncSugg(){
 /* לחיצה על תיאור מוצע: ממלאת את התיאור והקטגוריה (לא סכום). החשבון לפי אותו כלל של תיאור זהה */
 function pickDesc(i){
   const f=S.form,e=f&&f.descList&&f.descList[+i];if(!e)return;
-  $('#f-note').value=e.d;
-  f.catManual=false;
-  syncSugg();
+  const inp=$('#f-note');
+  // קודם סוגרים את המקלדת: באייפון, מילה שהמקלדת עוד "באמצע" שלה (השלמה אוטומטית) נכתבת חזרה לשדה כשהיא מסתיימת,
+  // ודורסת את התיאור שמילאנו ("קפ" במקום "קפה"). לכן כותבים אחרי הסגירה, ובודקים שוב רגע אחר כך
+  try{inp.blur();}catch(err){}
+  const apply=()=>{if(S.form!==f)return;inp.value=e.d;f.catManual=false;syncSugg();};
+  apply();
+  setTimeout(()=>{if(S.form===f&&inp.value!==e.d&&e.d.startsWith(inp.value))apply();},120);
+  // סימן שהבחירה נקלטה: השדה והקטגוריה מהבהבים לרגע
+  [inp,$('#f-cats .chip.on')].forEach(el=>{if(!el)return;el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');});
 }
 
 /* ================= UI bits ================= */
