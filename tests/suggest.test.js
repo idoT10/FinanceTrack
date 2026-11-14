@@ -74,8 +74,23 @@ module.exports=async t=>{
   t.ok($('#f-amount').value==='','…not the amount');
   t.ok(A.d.activeElement!==$('#f-note')&&$('#f-note').classList.contains('flash')&&$('#f-cats .chip.on').classList.contains('flash'),'b4: after the tap the keyboard closes, and the field and category flash');
   // b4: the iPhone keyboard finishing its word writes the typed text back ("סו") right after the tap
+  await sleep(1100);   // after the 1-second guard of the previous pick
   await note('סו');click($$('#f-desc-sugg .chip')[0]);A.type($('#f-note'),'סו');await sleep(200);
   t.ok($('#f-note').value==='סופר שופרסל'&&$('#f-desc-sugg').hidden,'b4: the picked description survives the keyboard writing back the typed letters');
+  // b5: a late write-back (after the rechecks) inside the first second is undone on the spot
+  await sleep(1100);
+  await note('סו');click($$('#f-desc-sugg .chip')[0]);await sleep(500);A.type($('#f-note'),'סו');await sleep(5);
+  t.ok($('#f-note').value==='סופר שופרסל','b5: a late write-back by the keyboard is undone');
+  // b5: the tap is handled on touchend, without waiting for a click
+  await sleep(600);await note('סו');
+  const chip=$$('#f-desc-sugg .chip')[0],T=(type,x)=>{const ev=new A.w.Event(type,{bubbles:true,cancelable:true});ev.touches=type==='touchend'?[]:[{clientX:x,clientY:5}];ev.changedTouches=[{clientX:x,clientY:5}];chip.dispatchEvent(ev);return ev;};
+  T('touchstart',10);const te=T('touchend',12);
+  t.ok($('#f-note').value==='סופר שופרסל'&&te.defaultPrevented,'b5: lifting the finger on a suggestion picks it (no click needed)');
+  await sleep(1100);await note('סו');const chip2=$$('#f-desc-sugg .chip')[0];
+  const T2=(type,x)=>{const ev=new A.w.Event(type,{bubbles:true,cancelable:true});ev.touches=[{clientX:x,clientY:5}];ev.changedTouches=[{clientX:x,clientY:5}];chip2.dispatchEvent(ev);};
+  T2('touchstart',10);T2('touchend',60);
+  t.ok($('#f-note').value==='סו','b5: a horizontal scroll over the suggestions does not pick');
+  t.ok(!$('#f-dbg').hidden&&/touchend/.test($('#f-dbg').textContent),'b5: the beta shows a small log of what happened');
   await close();
 
   // saving teaches
